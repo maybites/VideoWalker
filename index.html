@@ -9,8 +9,8 @@
     <style>
       body { font-family: Arial, sans-serif; }
       #map { height: 400px; width: 100%; }
-      #videoContainer { margin-top: 20px; }
-      iframe { width: 100%; height: 315px; display: none; }
+      #videoContainer { margin-top: 20px; display: none}
+      #player { width: 100%; height: 315px; } /* Adjust for YouTube IFrame player */
       #distanceInfo { margin-top: 20px; }
       .hidden { display: none; }
     </style>
@@ -31,13 +31,30 @@
       <h2>Your Current Location</h2>
       <div id="map"></div>
       <div id="videoContainer">
-        <iframe id="locationVideo" src="" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div id="player"></div> <!-- YouTube IFrame API will replace this div with the video player -->
       </div>
       <div id="distanceInfo"></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame API -->
     <script>
+
+      // 0. This code loads the IFrame Player API code asynchronously.
+      var tag = document.createElement('script');
+
+      tag.src = "https://www.youtube.com/iframe_api";
+      var firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+      // rest of code
+
+      let videosData = [];
+      let map, userMarker, player;
+      let videoToLoad = null; // Used to queue video loading if player isn't ready
+      let isPlayerReady = false; // Flag to track player readiness
+      let watchId = null; // Store the watch ID
+
       const nextButton = document.getElementById('nextToConsent');
       const acceptButton = document.getElementById('acceptConsent');
       const infoPage = document.getElementById('infoPage');
@@ -46,8 +63,11 @@
       const videoElement = document.getElementById('locationVideo');
       const distanceInfo = document.getElementById('distanceInfo');
 
-      let videosData = [];
-      let map, userMarker;
+      const PLAYER_UNSTARTED = -1;
+      const PLAYER_ENDED = 0;
+      const PLAYER_PLAYING = 1;
+      const PLAYER_PAUSED = 2;
+      const PLAYER_BUFFERING = 3;
 
       // Step 1: Transition from Info Page to Consent Page
       nextButton.addEventListener('click', () => {
@@ -74,18 +94,34 @@
         getUserLocation(); // Start tracking the user's location once the map is initialized
       }
 
+      /***************************/
+      /**                       **/
+      /**    GEOLOCATION API    **/
+      /**                       **/
+
       // Step 4: Get the user's location
       function getUserLocation() {
+        var location_timeout = null;
         if (navigator.geolocation) {
-          navigator.geolocation.watchPosition(success, error, {
-            enableHighAccuracy: true,
-            timeout: 30000, // Increased timeout to 30 seconds
-            maximumAge: 5000
-          }); 
-       } else {
+          seekLocation();
+        } else {
           alert('Geolocation is not supported by your browser.');
         }
 
+        function seekLocation(){
+          navigator.geolocation.getCurrentPosition(
+            success, 
+            error, 
+            {
+              enableHighAccuracy: true, // enable high accuracy
+              timeout: 10000, // wait for 10 seconds
+              maximumAge: 5000
+            }
+          );
+          //location_timeout = setTimeout(seekLocation, 10000);
+        };
+        
+        // callback function on success by geolocation.getCurrentPosition
         function success(position) {
           const { latitude, longitude } = position.coords;
           if (userMarker) {
@@ -96,6 +132,7 @@
           checkProximity(latitude, longitude);
         }
 
+        // callback function on error by geolocation.getCurrentPosition
         function error(err) {
           switch(err.code) {
             case err.PERMISSION_DENIED:
@@ -107,13 +144,28 @@
             case err.TIMEOUT:
               alert("The request to get user location timed out.");
               break;
-            case err.UNKNOWN_ERROR:
             default:
               alert("An unknown error occurred.");
               break;
           }
+          // Stop the geolocation watch listener on error
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null; // Clear the watchId after stopping it
+          }
         }
       }
+
+      /**                       **/
+      /**    GEOLOCATION API    **/
+      /**                       **/
+      /***************************/
+
+
+      /***************************/
+      /**                       **/
+      /**    LOAD CONFIG API    **/
+      /**                       **/
 
       // Step 5: Fetch videos.json file and load locations to map
       function fetchVideoLocations() {
@@ -149,6 +201,11 @@
         });
       }
 
+      /**                       **/
+      /**    LOAD CONFIG API    **/
+      /**                       **/
+      /***************************/
+
       // Step 7: Check proximity to a video location and load video if in range
       function checkProximity(latitude, longitude) {
         let closestLocation = null;
@@ -177,17 +234,89 @@
         }
       }
 
-      // Step 8: Play YouTube video when user enters a defined area
+      // Step 9: Play video (handles delayed video loading)
       function playVideo(videoUrl) {
-        videoElement.src = videoUrl + '?autoplay=1'; // Set YouTube video URL with autoplay
-        videoElement.style.display = 'block'; // Make the video visible
+        const videoId = extractVideoId(videoUrl);
+        if (isPlayerReady) {
+          player.loadVideoById(videoId);
+        } else {
+          videoToLoad = videoUrl; // Queue video for later if player is not ready
+        }
+        videoContainer.style.display = 'block';// Ensure the video element is visible
       }
 
       // Stop video playback when user exits all defined areas
       function stopVideo() {
-        videoElement.src = ''; // Clear the video URL
-        videoElement.style.display = 'none'; // Hide the video element
+        if (player && typeof player.stopVideo === 'function') {
+          player.stopVideo(); // Stop the video playback
+        }
+        videoContainer.style.display = 'none'; // Hide the video element
       }
+
+      /***********************/
+      /**                   **/
+      /**    YOUTUBE API    **/
+      /**                   **/
+
+      // Step 8: Initialize YouTube IFrame API player
+      function onYouTubeIframeAPIReady() {
+        // Initialize the YouTube player
+        player = new YT.Player('player', {
+          height: '315',
+          width: '100%',
+          playerVars: { 'autoplay': 1, 'controls': 1 },
+          events: {
+            'onReady': onPlayerReady,
+            'onError': onPlayerError,
+            'onStateChange': onPlayerStateChange
+          }
+        });
+      }
+
+      var done = false;
+      // call back function when youtube player status changed
+      function onPlayerStateChange(event) {
+        if (event.data == YT.PlayerState.PLAYING && !done) {
+          //setTimeout(stopVideo, 6000);
+          done = true;
+        }
+        if (event.data == PLAYER_ENDED) {
+          getUserLocation();
+        }
+      }
+
+      function getPlayerState(){
+        if (player && typeof player.stopVideo === 'function') {
+          return player.getPlayerState();
+        }        
+      }
+
+      // call back function when youtube player is ready
+      function onPlayerReady(event) {
+        isPlayerReady = true;
+        if (videoToLoad) {
+          const videoId = extractVideoId(videoToLoad);
+          console.log('Extracted video ID:', videoId);
+          if (videoId && videoId.length === 11) {
+            player.loadVideoById(videoId);
+          } else {
+            console.error('Invalid video ID:', videoToLoad);
+          }
+          videoToLoad = null; // Clear the queued video after loading
+        }
+      }
+
+      // call back function when youtube player error occured
+      function onPlayerError(event) {
+        console.error('Error playing video:', event);
+        alert('Failed to load the video. Please try again later.');
+      }
+
+      /**                   **/
+      /**    YOUTUBE API    **/
+      /**                   **/
+      /***********************/
+
 
       // Utility function to calculate direction based on two sets of lat/lon coordinates
       function calculateDirection(lat1, lon1, lat2, lon2) {
@@ -200,6 +329,13 @@
         const compassIndex = Math.round(((bearing + 360) % 360) / 45) % 8;
         return compassDirections[compassIndex];
       }
+
+      // Utility function to extract video ID from various YouTube URL formats
+      function extractVideoId(url) {
+          const videoIdMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+          return videoIdMatch ? videoIdMatch[1] : null; // Return the video ID if found
+      }
+
     </script>
   </body>
 </html>
