@@ -1,0 +1,14 @@
+[
+  {
+    "videoUrl": "https://www.youtube.com/embed/ulaFky_zUII",
+    "latitude": 47.390665,
+    "longitude": 8.527873,
+    "radius": 10
+  },
+  {
+    "videoUrl": "https://www.youtube.com/embed/XM_umIS7b-w",
+    "latitude": 47.390879,
+    "longitude": 8.527527,
+    "radius": 10
+  }
+]

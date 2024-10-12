@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Location-Based YouTube Video Playback</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.3/gh-fork-ribbon.min.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+      body { font-family: Arial, sans-serif; }
+      #map { height: 400px; width: 100%; }
+      #videoContainer { margin-top: 20px; }
+      iframe { width: 100%; height: 315px; display: none; }
+      #distanceInfo { margin-top: 20px; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="infoPage">
+      <h1>Welcome to the Location-Based YouTube Video Experience</h1>
+      <p>This page will guide you through an interactive location-based video experience.</p>
+      <button id="nextToConsent">Next</button>
+    </div>
+
+    <div id="consentPage" class="hidden">
+      <h2>We need your consent for location tracking</h2>
+      <button id="acceptConsent">Accept and Continue</button>
+    </div>
+
+    <div id="mapPage" class="hidden">
+      <h2>Your Current Location</h2>
+      <div id="map"></div>
+      <div id="videoContainer">
+        <iframe id="locationVideo" src="" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      </div>
+      <div id="distanceInfo"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+      const nextButton = document.getElementById('nextToConsent');
+      const acceptButton = document.getElementById('acceptConsent');
+      const infoPage = document.getElementById('infoPage');
+      const consentPage = document.getElementById('consentPage');
+      const mapPage = document.getElementById('mapPage');
+      const videoElement = document.getElementById('locationVideo');
+      const distanceInfo = document.getElementById('distanceInfo');
+
+      let videosData = [];
+      let map, userMarker;
+
+      // Step 1: Transition from Info Page to Consent Page
+      nextButton.addEventListener('click', () => {
+        infoPage.classList.add('hidden');
+        consentPage.classList.remove('hidden');
+      });
+
+      // Step 2: Consent to Geolocation and Initialize Map
+      acceptButton.addEventListener('click', () => {
+        consentPage.classList.add('hidden');
+        mapPage.classList.remove('hidden');
+        initMap(); // Initialize the map first
+        fetchVideoLocations(); // Fetch video locations only after map is initialized
+      });
+
+      // Step 3: Initialize OpenStreetMap
+      function initMap() {
+        map = L.map('map').setView([51.505, -0.09], 13); // Default view before getting the user's location
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        getUserLocation(); // Start tracking the user's location once the map is initialized
+      }
+
+      // Step 4: Get the user's location
+      function getUserLocation() {
+        if (navigator.geolocation) {
+          navigator.geolocation.watchPosition(success, error, {
+            enableHighAccuracy: true,
+            timeout: 30000, // Increased timeout to 30 seconds
+            maximumAge: 5000
+          }); 
+       } else {
+          alert('Geolocation is not supported by your browser.');
+        }
+
+        function success(position) {
+          const { latitude, longitude } = position.coords;
+          if (userMarker) {
+            map.removeLayer(userMarker);
+          }
+          userMarker = L.marker([latitude, longitude]).addTo(map);
+          map.setView([latitude, longitude], 13);
+          checkProximity(latitude, longitude);
+        }
+
+        function error(err) {
+          switch(err.code) {
+            case err.PERMISSION_DENIED:
+              alert("User denied the request for Geolocation.");
+              break;
+            case err.POSITION_UNAVAILABLE:
+              alert("Location information is unavailable.");
+              break;
+            case err.TIMEOUT:
+              alert("The request to get user location timed out.");
+              break;
+            case err.UNKNOWN_ERROR:
+            default:
+              alert("An unknown error occurred.");
+              break;
+          }
+        }
+      }
+
+      // Step 5: Fetch videos.json file and load locations to map
+      function fetchVideoLocations() {
+        fetch('videos.json')
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error('Failed to load videos.json');
+            }
+            return response.json();
+          })
+          .then((data) => {
+            videosData = data;
+            console.log('Loaded video data:', videosData); // Log the fetched data
+            addVideoLocationsToMap(); // Add locations to map only after data is fetched
+          })
+          .catch((error) => console.error('Error loading video locations:', error));
+      }
+
+      // Step 6: Add video location circles to the map
+      function addVideoLocationsToMap() {
+        videosData.forEach((video, index) => {
+          const { latitude, longitude, radius } = video;
+
+          // Check if latitude, longitude, and radius are defined and valid
+          if (typeof latitude === 'number' && typeof longitude === 'number' && typeof radius === 'number') {
+            L.circle([latitude, longitude], {
+              color: 'red',
+              radius: radius
+            }).addTo(map);
+          } else {
+            console.error(`Invalid data for video location at index ${index}:`, video);
+          }
+        });
+      }
+
+      // Step 7: Check proximity to a video location and load video if in range
+      function checkProximity(latitude, longitude) {
+        let closestLocation = null;
+        let closestDistance = Infinity;
+        let inProximity = false; // Flag to track if user is within a video perimeter
+
+        videosData.forEach((video) => {
+          const distance = map.distance([latitude, longitude], [video.latitude, video.longitude]);
+          if (distance <= video.radius) {
+            inProximity = true; // User is inside a perimeter
+            playVideo(video.videoUrl);
+            distanceInfo.textContent = ''; // Clear distance info if inside a perimeter
+          } else {
+            if (distance < closestDistance) {
+              closestDistance = distance;
+              closestLocation = video;
+            }
+          }
+        });
+
+        // If user is outside all perimeters, show distance and direction to the closest location
+        if (!inProximity && closestLocation) {
+          const direction = calculateDirection(latitude, longitude, closestLocation.latitude, closestLocation.longitude);
+          distanceInfo.textContent = `You are ${Math.round(closestDistance)} meters away from the closest location. Head ${direction}.`;
+          stopVideo();
+        }
+      }
+
+      // Step 8: Play YouTube video when user enters a defined area
+      function playVideo(videoUrl) {
+        videoElement.src = videoUrl + '?autoplay=1'; // Set YouTube video URL with autoplay
+        videoElement.style.display = 'block'; // Make the video visible
+      }
+
+      // Stop video playback when user exits all defined areas
+      function stopVideo() {
+        videoElement.src = ''; // Clear the video URL
+        videoElement.style.display = 'none'; // Hide the video element
+      }
+
+      // Utility function to calculate direction based on two sets of lat/lon coordinates
+      function calculateDirection(lat1, lon1, lat2, lon2) {
+        const rad = Math.PI / 180;
+        const dLon = (lon2 - lon1) * rad;
+        const y = Math.sin(dLon) * Math.cos(lat2 * rad);
+        const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) - Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos(dLon);
+        const bearing = Math.atan2(y, x) * (180 / Math.PI);
+        const compassDirections = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West'];
+        const compassIndex = Math.round(((bearing + 360) % 360) / 45) % 8;
+        return compassDirections[compassIndex];
+      }
+    </script>
+  </body>
+</html>
