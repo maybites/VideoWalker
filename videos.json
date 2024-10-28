@@ -9,6 +9,18 @@
     "videoUrl": "https://www.youtube.com/embed/XM_umIS7b-w",
     "latitude": 47.390879,
     "longitude": 8.527527,
+    "radius": 20
+  },
+  {
+    "videoUrl": "https://www.youtube.com/embed/Hm3JodBR-vs",
+    "latitude": 47.387731,
+    "longitude": 8.533936,
     "radius": 10
+  },
+  {
+    "videoUrl": "https://www.youtube.com/embed/a_C18uAZHdo",
+    "latitude": 47.388067,
+    "longitude": 8.533518,
+    "radius": 15
   }
 ]
