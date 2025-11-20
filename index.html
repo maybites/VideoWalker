@@ -57,6 +57,7 @@
       let isPlayerReady = false; // Flag to track player readiness
       let watchId = null; // Store the watch ID
       let locationUpdateCount = 0; // Counter for location updates
+      let hasInitiallycentered = false; // Flag to track if map has been centered on first location
 
       const nextButton = document.getElementById('nextToConsent');
       const acceptButton = document.getElementById('acceptConsent');
@@ -137,7 +138,13 @@
             map.removeLayer(userMarker);
           }
           userMarker = L.marker([latitude, longitude]).addTo(map);
-          map.setView([latitude, longitude], 13);
+          
+          // Only center the map on the first location update
+          if (!hasInitiallycentered) {
+            map.setView([latitude, longitude], 13);
+            hasInitiallycentered = true;
+          }
+          
           checkProximity(latitude, longitude);
         }
 
