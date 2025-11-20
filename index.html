@@ -18,7 +18,7 @@
     </style>
   </head>
   <body>
-    <div id="version">v1.0.3 - 2025-11-20</div>
+    <div id="version">v1.0.4 - 2025-11-20</div>
     <div id="infoPage">
       <h1>Welcome to the Location-Based YouTube Video Experience</h1>
       <p>This page will guide you through an interactive location-based video experience.</p>
@@ -232,6 +232,11 @@
                 popupContent += title ? `<br>${description}` : description;
               }
               circle.bindPopup(popupContent);
+              
+              // Explicitly add tap event for mobile devices
+              circle.on('click', function(e) {
+                this.openPopup();
+              });
             }
           } else {
             console.error(`Invalid data for video location at index ${index}:`, video);
