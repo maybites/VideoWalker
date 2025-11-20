@@ -6,6 +6,7 @@
     <title>Location-Based YouTube Video Playback</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.3/gh-fork-ribbon.min.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
     <style>
       body { font-family: Arial, sans-serif; }
       #map { height: 400px; width: 100%; }
@@ -20,7 +21,7 @@
     </style>
   </head>
   <body>
-    <div id="version">v1.0.5 - 2025-11-20</div>
+    <div id="version">v1.0.6 - 2025-11-20</div>
     <div id="fullscreenPage">
       <h1>Location-Based YouTube Video Experience</h1>
       <p>For the best experience, we recommend using fullscreen mode.</p>
@@ -49,6 +50,8 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame API -->
     <script>
 
@@ -120,8 +123,8 @@
       function initMap() {
         map = L.map('map').setView([51.505, -0.09], 13); // Default view before getting the user's location
 
-        L.tileLayer('https://tiles.openfreemap.org/styles/positron/{z}/{x}/{y}.png', {
-          attribution: '© OpenFreeMap contributors'
+        L.maplibreGL({
+          style: 'https://tiles.openfreemap.org/styles/positron'
         }).addTo(map);
 
         getUserLocation(); // Start tracking the user's location once the map is initialized
