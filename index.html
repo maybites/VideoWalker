@@ -60,6 +60,7 @@
       let watchId = null; // Store the watch ID
       let locationUpdateCount = 0; // Counter for location updates
       let hasInitiallycentered = false; // Flag to track if map has been centered on first location
+      let isVideoPlaying = false; // Flag to track if video is currently playing
 
       const nextButton = document.getElementById('nextToConsent');
       const acceptButton = document.getElementById('acceptConsent');
@@ -136,6 +137,13 @@
           locationUpdateCount++;
           console.log('Location updated:', latitude, longitude, '(Update #' + locationUpdateCount + ')');
           document.getElementById('updateCounter').textContent = locationUpdateCount;
+          
+          // Skip location updates and proximity checks while video is playing
+          if (isVideoPlaying) {
+            console.log('Video is playing - skipping location processing');
+            return;
+          }
+          
           if (userMarker) {
             map.removeLayer(userMarker);
           }
@@ -295,11 +303,14 @@
       // call back function when youtube player status changed
       function onPlayerStateChange(event) {
         if (event.data == YT.PlayerState.PLAYING && !done) {
-          //setTimeout(stopVideo, 6000);
+          isVideoPlaying = true;
+          console.log('Video started playing - location updates paused');
           done = true;
         }
         if (event.data == PLAYER_ENDED) {
-          getUserLocation();
+          isVideoPlaying = false;
+          console.log('Video ended - resuming location updates');
+          done = false;
         }
       }
 
