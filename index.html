@@ -76,9 +76,8 @@
     </style>
   </head>
   <body>
-    <div id="version">v1.0.9 - 2025-11-20</div>
+    <div id="version">v1.0.10 - 2025-11-20</div>
     <div id="languagePage" class="intro-page">
-      <h1>Select Language / Sprache wählen</h1>
       <div>
         <button class="languageButton" data-lang="en">English</button>
         <button class="languageButton" data-lang="de">Deutsch</button>
@@ -103,7 +102,6 @@
     </div>
 
     <div id="mapPage" class="hidden">
-      <h2 data-i18n="mapTitle">Your Current Location</h2>
       <div id="map"></div>
       <div id="videoContainer">
         <div id="player"></div> <!-- YouTube IFrame API will replace this div with the video player -->
@@ -130,10 +128,10 @@
       // Translations
       const translations = {
         en: {
-          fullscreenTitle: "Location-Based YouTube Video Experience",
+          fullscreenTitle: "VideoWalk Experience",
           fullscreenDescription: "For the best experience, we recommend using fullscreen mode.",
           fullscreenButton: "Enter Fullscreen & Start",
-          infoTitle: "Welcome to the Location-Based YouTube Video Experience",
+          infoTitle: "Welcome to the VideoWalk Experience",
           infoDescription: "This page will guide you through an interactive location-based video experience.",
           nextButton: "Next",
           consentTitle: "We need your consent for location tracking",
@@ -143,10 +141,10 @@
           locationUpdates: "Location updates:"
         },
         de: {
-          fullscreenTitle: "Standortbasiertes YouTube-Video-Erlebnis",
+          fullscreenTitle: "VideoWalk Erlebnis",
           fullscreenDescription: "Für das beste Erlebnis empfehlen wir den Vollbildmodus.",
           fullscreenButton: "Vollbild aktivieren & Starten",
-          infoTitle: "Willkommen beim standortbasierten YouTube-Video-Erlebnis",
+          infoTitle: "Willkommen beim VideoWalk Erlebnis",
           infoDescription: "Diese Seite führt Sie durch ein interaktives standortbasiertes Video-Erlebnis.",
           nextButton: "Weiter",
           consentTitle: "Wir benötigen Ihre Zustimmung zur Standortverfolgung",
@@ -327,9 +325,9 @@
           }
           userMarker = L.marker([latitude, longitude]).addTo(map);
           
-          // Only center the map on the first location update
+          // Only center the map on the first location update with higher zoom
           if (!hasInitiallycentered) {
-            map.setView([latitude, longitude], 13);
+            map.setView([latitude, longitude], 17);
             hasInitiallycentered = true;
           }
           
