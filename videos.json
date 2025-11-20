@@ -7,20 +7,20 @@
   },
   {
     "videoUrl": "https://www.youtube.com/embed/XM_umIS7b-w",
-    "latitude": 47.39188,
-    "longitude": 8.51003,
+    "latitude": 47.391994,
+    "longitude": 8.511899,
     "radius": 20
   },
   {
     "videoUrl": "https://www.youtube.com/embed/Hm3JodBR-vs",
-    "latitude": 47.39166,
-    "longitude": 8.51076,
+    "latitude": 47.391649,
+    "longitude": 8.513339,
     "radius": 10
   },
   {
     "videoUrl": "https://www.youtube.com/embed/a_C18uAZHdo",
-    "latitude": 47.39036,
-    "longitude": 8.51161,
+    "latitude": 47.390191,
+    "longitude": 8.512267,
     "radius": 10
   }
 ]
