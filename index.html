@@ -15,32 +15,43 @@
       #distanceInfo { margin-top: 20px; }
       #debugInfo { margin-top: 10px; padding: 10px; background-color: #f0f0f0; border: 1px solid #ccc; font-family: monospace; }
       #version { position: fixed; top: 10px; right: 10px; background-color: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; z-index: 1000; }
+      #languagePage { text-align: center; padding: 50px 20px; }
+      #languagePage h1 { margin-bottom: 40px; }
+      .languageButton { padding: 20px 40px; font-size: 24px; margin: 10px; cursor: pointer; min-width: 200px; }
       #fullscreenPage { text-align: center; padding: 50px 20px; }
       #enterFullscreen { padding: 15px 30px; font-size: 18px; cursor: pointer; }
       .hidden { display: none; }
     </style>
   </head>
   <body>
-    <div id="version">v1.0.6 - 2025-11-20</div>
-    <div id="fullscreenPage">
-      <h1>Location-Based YouTube Video Experience</h1>
-      <p>For the best experience, we recommend using fullscreen mode.</p>
-      <button id="enterFullscreen">Enter Fullscreen & Start</button>
+    <div id="version">v1.0.7 - 2025-11-20</div>
+    <div id="languagePage">
+      <h1>Select Language / Sprache wählen</h1>
+      <div>
+        <button class="languageButton" data-lang="en">English</button>
+        <button class="languageButton" data-lang="de">Deutsch</button>
+      </div>
+    </div>
+    
+    <div id="fullscreenPage" class="hidden">
+      <h1 data-i18n="fullscreenTitle">Location-Based YouTube Video Experience</h1>
+      <p data-i18n="fullscreenDescription">For the best experience, we recommend using fullscreen mode.</p>
+      <button id="enterFullscreen" data-i18n="fullscreenButton">Enter Fullscreen & Start</button>
     </div>
     
     <div id="infoPage" class="hidden">
-      <h1>Welcome to the Location-Based YouTube Video Experience</h1>
-      <p>This page will guide you through an interactive location-based video experience.</p>
-      <button id="nextToConsent">Next</button>
+      <h1 data-i18n="infoTitle">Welcome to the Location-Based YouTube Video Experience</h1>
+      <p data-i18n="infoDescription">This page will guide you through an interactive location-based video experience.</p>
+      <button id="nextToConsent" data-i18n="nextButton">Next</button>
     </div>
 
     <div id="consentPage" class="hidden">
-      <h2>We need your consent for location tracking</h2>
-      <button id="acceptConsent">Accept and Continue</button>
+      <h2 data-i18n="consentTitle">We need your consent for location tracking</h2>
+      <button id="acceptConsent" data-i18n="consentButton">Accept and Continue</button>
     </div>
 
     <div id="mapPage" class="hidden">
-      <h2>Your Current Location</h2>
+      <h2 data-i18n="mapTitle">Your Current Location</h2>
       <div id="map"></div>
       <div id="videoContainer">
         <div id="player"></div> <!-- YouTube IFrame API will replace this div with the video player -->
@@ -64,6 +75,38 @@
 
       // rest of code
 
+      // Translations
+      const translations = {
+        en: {
+          fullscreenTitle: "Location-Based YouTube Video Experience",
+          fullscreenDescription: "For the best experience, we recommend using fullscreen mode.",
+          fullscreenButton: "Enter Fullscreen & Start",
+          infoTitle: "Welcome to the Location-Based YouTube Video Experience",
+          infoDescription: "This page will guide you through an interactive location-based video experience.",
+          nextButton: "Next",
+          consentTitle: "We need your consent for location tracking",
+          consentButton: "Accept and Continue",
+          mapTitle: "Your Current Location",
+          distanceText: "You are {distance} meters away from the closest location. Head {direction}.",
+          locationUpdates: "Location updates:"
+        },
+        de: {
+          fullscreenTitle: "Standortbasiertes YouTube-Video-Erlebnis",
+          fullscreenDescription: "Für das beste Erlebnis empfehlen wir den Vollbildmodus.",
+          fullscreenButton: "Vollbild aktivieren & Starten",
+          infoTitle: "Willkommen beim standortbasierten YouTube-Video-Erlebnis",
+          infoDescription: "Diese Seite führt Sie durch ein interaktives standortbasiertes Video-Erlebnis.",
+          nextButton: "Weiter",
+          consentTitle: "Wir benötigen Ihre Zustimmung zur Standortverfolgung",
+          consentButton: "Akzeptieren und Fortfahren",
+          mapTitle: "Ihr aktueller Standort",
+          distanceText: "Sie sind {distance} Meter vom nächsten Standort entfernt. Gehen Sie nach {direction}.",
+          locationUpdates: "Standort-Updates:"
+        }
+      };
+
+      let selectedLanguage = 'en';
+
       let videosData = [];
       let map, userMarker, player;
       let videoToLoad = null; // Used to queue video loading if player isn't ready
@@ -73,6 +116,8 @@
       let hasInitiallycentered = false; // Flag to track if map has been centered on first location
       let isVideoPlaying = false; // Flag to track if video is currently playing
 
+      const languagePage = document.getElementById('languagePage');
+      const languageButtons = document.querySelectorAll('.languageButton');
       const enterFullscreenButton = document.getElementById('enterFullscreen');
       const fullscreenPage = document.getElementById('fullscreenPage');
       const nextButton = document.getElementById('nextToConsent');
@@ -83,11 +128,39 @@
       const videoElement = document.getElementById('locationVideo');
       const distanceInfo = document.getElementById('distanceInfo');
 
+      // Translation function
+      function t(key) {
+        return translations[selectedLanguage][key] || key;
+      }
+
+      // Update all translatable elements
+      function updateLanguage() {
+        document.querySelectorAll('[data-i18n]').forEach(element => {
+          const key = element.getAttribute('data-i18n');
+          element.textContent = t(key);
+        });
+        // Update debug info label
+        const debugLabel = document.querySelector('#debugInfo');
+        if (debugLabel) {
+          debugLabel.innerHTML = t('locationUpdates') + ' <span id="updateCounter">' + locationUpdateCount + '</span>';
+        }
+      }
+
       const PLAYER_UNSTARTED = -1;
       const PLAYER_ENDED = 0;
       const PLAYER_PLAYING = 1;
       const PLAYER_PAUSED = 2;
       const PLAYER_BUFFERING = 3;
+
+      // Step -1: Language Selection
+      languageButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          selectedLanguage = button.getAttribute('data-lang');
+          updateLanguage();
+          languagePage.classList.add('hidden');
+          fullscreenPage.classList.remove('hidden');
+        });
+      });
 
       // Step 0: Enter Fullscreen and transition to Info Page
       enterFullscreenButton.addEventListener('click', () => {
@@ -252,13 +325,16 @@
             }).addTo(map);
             
             // Add popup with title and description if available
-            if (title || description) {
+            const videoTitle = typeof title === 'object' ? (title[selectedLanguage] || title.en) : title;
+            const videoDescription = typeof description === 'object' ? (description[selectedLanguage] || description.en) : description;
+            
+            if (videoTitle || videoDescription) {
               let popupContent = '';
-              if (title) {
-                popupContent += `<strong>${title}</strong>`;
+              if (videoTitle) {
+                popupContent += `<strong>${videoTitle}</strong>`;
               }
-              if (description) {
-                popupContent += title ? `<br>${description}` : description;
+              if (videoDescription) {
+                popupContent += videoTitle ? `<br>${videoDescription}` : videoDescription;
               }
               circle.bindPopup(popupContent);
               
@@ -301,7 +377,10 @@
         // If user is outside all perimeters, show distance and direction to the closest location
         if (!inProximity && closestLocation) {
           const direction = calculateDirection(latitude, longitude, closestLocation.latitude, closestLocation.longitude);
-          distanceInfo.textContent = `You are ${Math.round(closestDistance)} meters away from the closest location. Head ${direction}.`;
+          const distanceText = t('distanceText')
+            .replace('{distance}', Math.round(closestDistance))
+            .replace('{direction}', direction);
+          distanceInfo.textContent = distanceText;
           stopVideo();
         }
       }
