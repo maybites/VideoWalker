@@ -1,26 +1,26 @@
 [
   {
     "videoUrl": "https://www.youtube.com/embed/ulaFky_zUII",
-    "latitude": 47.3917837,
-    "longitude": 8.5117945,
+    "latitude": 47.39178,
+    "longitude": 8.51179,
     "radius": 10
   },
   {
     "videoUrl": "https://www.youtube.com/embed/XM_umIS7b-w",
-    "latitude": 47.3918847,
-    "longitude": 8.5100351,
+    "latitude": 47.39188,
+    "longitude": 8.51003,
     "radius": 20
   },
   {
     "videoUrl": "https://www.youtube.com/embed/Hm3JodBR-vs",
-    "latitude": 47.3916666,
-    "longitude": 8.5107651,
+    "latitude": 47.39166,
+    "longitude": 8.51076,
     "radius": 10
   },
   {
     "videoUrl": "https://www.youtube.com/embed/a_C18uAZHdo",
-    "latitude": 47.3903619,
-    "longitude": 8.5116103,
-    "radius": 15
+    "latitude": 47.39036,
+    "longitude": 8.51161,
+    "radius": 10
   }
 ]
