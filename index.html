@@ -24,7 +24,7 @@
     </style>
   </head>
   <body>
-    <div id="version">v1.0.7 - 2025-11-20</div>
+    <div id="version">v1.0.8 - 2025-11-20</div>
     <div id="languagePage">
       <h1>Select Language / Sprache wählen</h1>
       <div>
@@ -108,6 +108,7 @@
       let selectedLanguage = 'en';
 
       let videosData = [];
+      let videoCircles = []; // Store circles to update popups when language changes
       let map, userMarker, player;
       let videoToLoad = null; // Used to queue video loading if player isn't ready
       let isPlayerReady = false; // Flag to track player readiness
@@ -144,6 +145,29 @@
         if (debugLabel) {
           debugLabel.innerHTML = t('locationUpdates') + ' <span id="updateCounter">' + locationUpdateCount + '</span>';
         }
+        // Update popup content for existing circles
+        updatePopupContent();
+      }
+
+      // Update popup content based on selected language
+      function updatePopupContent() {
+        videoCircles.forEach(circleData => {
+          const { circle, video } = circleData;
+          const { title, description } = video;
+          const videoTitle = typeof title === 'object' ? (title[selectedLanguage] || title.en) : title;
+          const videoDescription = typeof description === 'object' ? (description[selectedLanguage] || description.en) : description;
+          
+          if (videoTitle || videoDescription) {
+            let popupContent = '';
+            if (videoTitle) {
+              popupContent += `<strong>${videoTitle}</strong>`;
+            }
+            if (videoDescription) {
+              popupContent += videoTitle ? `<br>${videoDescription}` : videoDescription;
+            }
+            circle.setPopupContent(popupContent);
+          }
+        });
       }
 
       const PLAYER_UNSTARTED = -1;
@@ -342,6 +366,9 @@
               circle.on('click', function(e) {
                 this.openPopup();
               });
+              
+              // Store circle and video data for later updates
+              videoCircles.push({ circle, video });
             }
           } else {
             console.error(`Invalid data for video location at index ${index}:`, video);
