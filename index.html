@@ -12,6 +12,7 @@
       #videoContainer { margin-top: 20px; display: none}
       #player { width: 100%; height: 315px; } /* Adjust for YouTube IFrame player */
       #distanceInfo { margin-top: 20px; }
+      #debugInfo { margin-top: 10px; padding: 10px; background-color: #f0f0f0; border: 1px solid #ccc; font-family: monospace; }
       .hidden { display: none; }
     </style>
   </head>
@@ -34,6 +35,7 @@
         <div id="player"></div> <!-- YouTube IFrame API will replace this div with the video player -->
       </div>
       <div id="distanceInfo"></div>
+      <div id="debugInfo">Location updates: <span id="updateCounter">0</span></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -54,6 +56,7 @@
       let videoToLoad = null; // Used to queue video loading if player isn't ready
       let isPlayerReady = false; // Flag to track player readiness
       let watchId = null; // Store the watch ID
+      let locationUpdateCount = 0; // Counter for location updates
 
       const nextButton = document.getElementById('nextToConsent');
       const acceptButton = document.getElementById('acceptConsent');
@@ -99,31 +102,37 @@
       /**    GEOLOCATION API    **/
       /**                       **/
 
-      // Step 4: Get the user's location
+      // Step 4: Get the user's location with continuous 5-second updates
       function getUserLocation() {
-        var location_timeout = null;
         if (navigator.geolocation) {
-          seekLocation();
-        } else {
-          alert('Geolocation is not supported by your browser.');
-        }
-
-        function seekLocation(){
-          navigator.geolocation.getCurrentPosition(
+          // Use watchPosition for continuous location updates
+          watchId = navigator.geolocation.watchPosition(
             success, 
             error, 
             {
               enableHighAccuracy: true, // enable high accuracy
               timeout: 10000, // wait for 10 seconds
-              maximumAge: 5000
+              maximumAge: 0 // don't use cached position
             }
           );
-          //location_timeout = setTimeout(seekLocation, 10000);
-        };
+          
+          // Set up 5-second interval to request fresh location
+          setInterval(() => {
+            if (watchId !== null) {
+              // watchPosition will automatically trigger success callback
+              console.log('Location update requested (5-second interval)');
+            }
+          }, 5000);
+        } else {
+          alert('Geolocation is not supported by your browser.');
+        }
         
-        // callback function on success by geolocation.getCurrentPosition
+        // callback function on success by geolocation.watchPosition
         function success(position) {
           const { latitude, longitude } = position.coords;
+          locationUpdateCount++;
+          console.log('Location updated:', latitude, longitude, '(Update #' + locationUpdateCount + ')');
+          document.getElementById('updateCounter').textContent = locationUpdateCount;
           if (userMarker) {
             map.removeLayer(userMarker);
           }
@@ -132,7 +141,7 @@
           checkProximity(latitude, longitude);
         }
 
-        // callback function on error by geolocation.getCurrentPosition
+        // callback function on error by geolocation.watchPosition
         function error(err) {
           switch(err.code) {
             case err.PERMISSION_DENIED:
