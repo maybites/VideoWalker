@@ -3,24 +3,32 @@
     "videoUrl": "https://www.youtube.com/embed/ulaFky_zUII",
     "latitude": 47.3902729,
     "longitude": 8.5107042,
-    "radius": 20
+    "radius": 20,
+    "title": "Location 1",
+    "description": "First video location - 20m radius"
   },
   {
     "videoUrl": "https://www.youtube.com/embed/XM_umIS7b-w",
     "latitude": 47.3920324,
     "longitude": 8.5118911,
-    "radius": 20
+    "radius": 20,
+    "title": "Location 2",
+    "description": "Second video location - 20m radius"
   },
   {
     "videoUrl": "https://www.youtube.com/embed/Hm3JodBR-vs",
     "latitude": 47.391649,
     "longitude": 8.513339,
-    "radius": 10
+    "radius": 10,
+    "title": "Location 3",
+    "description": "Third video location - 10m radius"
   },
   {
     "videoUrl": "https://www.youtube.com/embed/a_C18uAZHdo",
     "latitude": 47.390331,
     "longitude": 8.512387,
-    "radius": 20
+    "radius": 20,
+    "title": "Location 4",
+    "description": "Fourth video location - 20m radius"
   }
 ]
