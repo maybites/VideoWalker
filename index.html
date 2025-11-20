@@ -66,17 +66,88 @@
         min-width: 220px;
       }
       
-      #map { height: 400px; width: 100%; }
-      #videoContainer { margin-top: 20px; display: none}
-      #player { width: 100%; height: 315px; } /* Adjust for YouTube IFrame player */
-      #distanceInfo { margin-top: 20px; }
-      #debugInfo { margin-top: 10px; padding: 10px; background-color: #f0f0f0; border: 1px solid #ccc; font-family: monospace; }
+      /* Map page - fullscreen */
+      #mapPage {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+      }
+      
+      #map { 
+        width: 100%; 
+        height: 100vh;
+      }
+      
+      /* Video page - fullscreen with black background */
+      #videoPage {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background-color: #000;
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      #videoContainer {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      #player { 
+        width: 100%; 
+        height: 100%;
+      }
+      
+      #closeVideo {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 2001;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: rgba(255, 255, 255, 0.9);
+        border: none;
+        border-radius: 5px;
+        color: #333;
+      }
+      
+      #closeVideo:hover {
+        background-color: #fff;
+      }
+      
+      /* Popup play button */
+      .popup-play-button {
+        display: block;
+        margin-top: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #333;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+      }
+      
+      .popup-play-button:hover {
+        background-color: #555;
+      }
+      
       #version { position: fixed; top: 10px; right: 10px; background-color: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; z-index: 1000; }
       .hidden { display: none; }
     </style>
   </head>
   <body>
-    <div id="version">v1.0.10 - 2025-11-20</div>
+    <div id="version">v1.1.1 - 2025-11-20</div>
     <div id="languagePage" class="intro-page">
       <div>
         <button class="languageButton" data-lang="en">English</button>
@@ -103,11 +174,13 @@
 
     <div id="mapPage" class="hidden">
       <div id="map"></div>
+    </div>
+    
+    <div id="videoPage" class="hidden">
+      <button id="closeVideo" data-i18n="closeVideoButton">Close Video</button>
       <div id="videoContainer">
         <div id="player"></div> <!-- YouTube IFrame API will replace this div with the video player -->
       </div>
-      <div id="distanceInfo"></div>
-      <div id="debugInfo">Location updates: <span id="updateCounter">0</span></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -137,8 +210,8 @@
           consentTitle: "We need your consent for location tracking",
           consentButton: "Accept and Continue",
           mapTitle: "Your Current Location",
-          distanceText: "You are {distance} meters away from the closest location. Head {direction}.",
-          locationUpdates: "Location updates:"
+          playVideoButton: "Play Video",
+          closeVideoButton: "Close Video"
         },
         de: {
           fullscreenTitle: "VideoWalk Erlebnis",
@@ -150,8 +223,8 @@
           consentTitle: "Wir benötigen Ihre Zustimmung zur Standortverfolgung",
           consentButton: "Akzeptieren und Fortfahren",
           mapTitle: "Ihr aktueller Standort",
-          distanceText: "Sie sind {distance} Meter vom nächsten Standort entfernt. Gehen Sie nach {direction}.",
-          locationUpdates: "Standort-Updates:"
+          playVideoButton: "Video abspielen",
+          closeVideoButton: "Video schließen"
         }
       };
 
@@ -176,8 +249,9 @@
       const infoPage = document.getElementById('infoPage');
       const consentPage = document.getElementById('consentPage');
       const mapPage = document.getElementById('mapPage');
+      const videoPage = document.getElementById('videoPage');
+      const closeVideoButton = document.getElementById('closeVideo');
       const videoElement = document.getElementById('locationVideo');
-      const distanceInfo = document.getElementById('distanceInfo');
 
       // Translation function
       function t(key) {
@@ -190,11 +264,6 @@
           const key = element.getAttribute('data-i18n');
           element.textContent = t(key);
         });
-        // Update debug info label
-        const debugLabel = document.querySelector('#debugInfo');
-        if (debugLabel) {
-          debugLabel.innerHTML = t('locationUpdates') + ' <span id="updateCounter">' + locationUpdateCount + '</span>';
-        }
         // Update popup content for existing circles
         updatePopupContent();
       }
@@ -203,7 +272,7 @@
       function updatePopupContent() {
         videoCircles.forEach(circleData => {
           const { circle, video } = circleData;
-          const { title, description } = video;
+          const { title, description, videoUrl } = video;
           const videoTitle = typeof title === 'object' ? (title[selectedLanguage] || title.en) : title;
           const videoDescription = typeof description === 'object' ? (description[selectedLanguage] || description.en) : description;
           
@@ -215,6 +284,7 @@
             if (videoDescription) {
               popupContent += videoTitle ? `<br>${videoDescription}` : videoDescription;
             }
+            popupContent += `<br><button class="popup-play-button" onclick="playVideoFromPopup('${videoUrl}')">${t('playVideoButton')}</button>`;
             circle.setPopupContent(popupContent);
           }
         });
@@ -225,6 +295,13 @@
       const PLAYER_PLAYING = 1;
       const PLAYER_PAUSED = 2;
       const PLAYER_BUFFERING = 3;
+
+      // Close video and return to map
+      closeVideoButton.addEventListener('click', () => {
+        stopVideo();
+        videoPage.classList.add('hidden');
+        mapPage.classList.remove('hidden');
+      });
 
       // Step -1: Language Selection
       languageButtons.forEach(button => {
@@ -327,7 +404,7 @@
           
           // Only center the map on the first location update with higher zoom
           if (!hasInitiallycentered) {
-            map.setView([latitude, longitude], 17);
+            map.setView([latitude, longitude], 15);
             hasInitiallycentered = true;
           }
           
@@ -398,7 +475,7 @@
               radius: radius
             }).addTo(map);
             
-            // Add popup with title and description if available
+            // Add popup with title, description, and play button
             const videoTitle = typeof title === 'object' ? (title[selectedLanguage] || title.en) : title;
             const videoDescription = typeof description === 'object' ? (description[selectedLanguage] || description.en) : description;
             
@@ -410,6 +487,7 @@
               if (videoDescription) {
                 popupContent += videoTitle ? `<br>${videoDescription}` : videoDescription;
               }
+              popupContent += `<br><button class="popup-play-button" onclick="playVideoFromPopup('${video.videoUrl}')">${t('playVideoButton')}</button>`;
               circle.bindPopup(popupContent);
               
               // Explicitly add tap event for mobile devices
@@ -431,36 +509,24 @@
       /**                       **/
       /***************************/
 
-      // Step 7: Check proximity to a video location and load video if in range
+      // Step 7: Check proximity to a video location and show popup if in range
       function checkProximity(latitude, longitude) {
-        let closestLocation = null;
-        let closestDistance = Infinity;
-        let inProximity = false; // Flag to track if user is within a video perimeter
-
-        videosData.forEach((video) => {
+        videosData.forEach((video, index) => {
           const distance = map.distance([latitude, longitude], [video.latitude, video.longitude]);
           if (distance <= video.radius) {
-            inProximity = true; // User is inside a perimeter
-            playVideo(video.videoUrl);
-            distanceInfo.textContent = ''; // Clear distance info if inside a perimeter
-          } else {
-            if (distance < closestDistance) {
-              closestDistance = distance;
-              closestLocation = video;
+            // User is inside a perimeter - open the popup
+            const circleData = videoCircles[index];
+            if (circleData && circleData.circle) {
+              circleData.circle.openPopup();
             }
           }
         });
-
-        // If user is outside all perimeters, show distance and direction to the closest location
-        if (!inProximity && closestLocation) {
-          const direction = calculateDirection(latitude, longitude, closestLocation.latitude, closestLocation.longitude);
-          const distanceText = t('distanceText')
-            .replace('{distance}', Math.round(closestDistance))
-            .replace('{direction}', direction);
-          distanceInfo.textContent = distanceText;
-          stopVideo();
-        }
       }
+
+      // Play video from popup button (global function for onclick)
+      window.playVideoFromPopup = function(videoUrl) {
+        playVideo(videoUrl);
+      };
 
       // Step 9: Play video (handles delayed video loading)
       function playVideo(videoUrl) {
@@ -470,15 +536,16 @@
         } else {
           videoToLoad = videoUrl; // Queue video for later if player is not ready
         }
-        videoContainer.style.display = 'block';// Ensure the video element is visible
+        // Show video page, hide map page
+        mapPage.classList.add('hidden');
+        videoPage.classList.remove('hidden');
       }
 
-      // Stop video playback when user exits all defined areas
+      // Stop video playback
       function stopVideo() {
         if (player && typeof player.stopVideo === 'function') {
           player.stopVideo(); // Stop the video playback
         }
-        videoContainer.style.display = 'none'; // Hide the video element
       }
 
       /***********************/
