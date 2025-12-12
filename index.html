@@ -124,6 +124,16 @@
         height: 100%;
       }
       
+      #vimeoPlayer {
+        width: 100%;
+        height: 100%;
+      }
+      
+      #vimeoPlayer iframe {
+        width: 100%;
+        height: 100%;
+      }
+      
       #closeVideo {
         position: fixed;
         top: 20px;
@@ -1045,7 +1055,7 @@
         // Create new Vimeo player
         vimeoPlayer = new Vimeo.Player('vimeoPlayer', {
           id: videoId,
-          width: 640,
+          responsive: true,
           autoplay: true
         });
         
