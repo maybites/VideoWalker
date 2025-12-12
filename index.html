@@ -593,7 +593,8 @@
         const langNames = { en: 'English', de: 'Deutsch' };
         menuVersion.textContent = (configData?.version ? 'v' + configData.version : 'v1.2.0') + ' - ' + (langNames[selectedLanguage] || selectedLanguage.toUpperCase());
         
-        menuOverlay.classList.add('hidden');
+        // Keep menu open so user can see the language change
+        // menuOverlay.classList.add('hidden'); // Removed - menu stays open
       });
 
       // Menu - Impressum
