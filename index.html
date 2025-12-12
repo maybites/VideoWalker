@@ -305,6 +305,13 @@
         stopVideo();
         videoPage.classList.add('hidden');
         mapPage.classList.remove('hidden');
+        
+        // Fix map display after screen rotation - force Leaflet to recalculate dimensions
+        setTimeout(() => {
+          if (map) {
+            map.invalidateSize();
+          }
+        }, 100);
       });
 
       // Step -1: Language Selection
