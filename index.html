@@ -401,6 +401,11 @@
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame API -->
     <script>
+      // YouTube player variables (must be global for YouTube API callback)
+      var player;
+      var videoToLoad = null;
+      var isPlayerReady = false;
+      var isVideoPlaying = false;
 
       // Wait for DOM to be fully loaded
       document.addEventListener('DOMContentLoaded', function() {
@@ -499,13 +504,10 @@
       let configData = null;
       let videosData = [];
       let videoCircles = []; // Store circles to update popups when language changes
-      let map, userMarker, player;
-      let videoToLoad = null; // Used to queue video loading if player isn't ready
-      let isPlayerReady = false; // Flag to track player readiness
+      let map, userMarker;
       let watchId = null; // Store the watch ID
       let locationUpdateCount = 0; // Counter for location updates
       let hasInitiallycentered = false; // Flag to track if map has been centered on first location
-      let isVideoPlaying = false; // Flag to track if video is currently playing
 
       const languagePage = document.getElementById('languagePage');
       const languageButtons = document.querySelectorAll('.languageButton');
@@ -1011,12 +1013,38 @@
         isVideoPlaying = false;
       }
 
+      function getPlayerState(){
+        if (player && typeof player.stopVideo === 'function') {
+          return player.getPlayerState();
+        }        
+      }
+
+      // Utility function to calculate direction based on two sets of lat/lon coordinates
+      function calculateDirection(lat1, lon1, lat2, lon2) {
+        const rad = Math.PI / 180;
+        const dLon = (lon2 - lon1) * rad;
+        const y = Math.sin(dLon) * Math.cos(lat2 * rad);
+        const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) - Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos(dLon);
+        const bearing = Math.atan2(y, x) * (180 / Math.PI);
+        const compassDirections = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West'];
+        const compassIndex = Math.round(((bearing + 360) % 360) / 45) % 8;
+        return compassDirections[compassIndex];
+      }
+
+      }); // End DOMContentLoaded
+
       /***********************/
       /**                   **/
       /**    YOUTUBE API    **/
       /**                   **/
 
-      // Step 8: Initialize YouTube IFrame API player
+      // Utility function to extract video ID from various YouTube URL formats
+      function extractVideoId(url) {
+        const videoIdMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        return videoIdMatch ? videoIdMatch[1] : null;
+      }
+
+      // YouTube IFrame API Ready callback (must be global)
       function onYouTubeIframeAPIReady() {
         // Initialize the YouTube player
         player = new YT.Player('player', {
@@ -1039,17 +1067,11 @@
           console.log('Video started playing - location updates paused');
           done = true;
         }
-        if (event.data == PLAYER_ENDED) {
+        if (event.data == YT.PlayerState.ENDED) {
           isVideoPlaying = false;
           console.log('Video ended - resuming location updates');
           done = false;
         }
-      }
-
-      function getPlayerState(){
-        if (player && typeof player.stopVideo === 'function') {
-          return player.getPlayerState();
-        }        
       }
 
       // call back function when youtube player is ready
@@ -1077,27 +1099,6 @@
       /**    YOUTUBE API    **/
       /**                   **/
       /***********************/
-
-
-      // Utility function to calculate direction based on two sets of lat/lon coordinates
-      function calculateDirection(lat1, lon1, lat2, lon2) {
-        const rad = Math.PI / 180;
-        const dLon = (lon2 - lon1) * rad;
-        const y = Math.sin(dLon) * Math.cos(lat2 * rad);
-        const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) - Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos(dLon);
-        const bearing = Math.atan2(y, x) * (180 / Math.PI);
-        const compassDirections = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West'];
-        const compassIndex = Math.round(((bearing + 360) % 360) / 45) % 8;
-        return compassDirections[compassIndex];
-      }
-
-      // Utility function to extract video ID from various YouTube URL formats
-      function extractVideoId(url) {
-        const videoIdMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-        return videoIdMatch ? videoIdMatch[1] : null;
-      }
-
-      }); // End DOMContentLoaded
 
     </script>
   </body>
