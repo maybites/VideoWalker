@@ -336,6 +336,9 @@
     <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame API -->
     <script>
 
+      // Wait for DOM to be fully loaded
+      document.addEventListener('DOMContentLoaded', function() {
+
       // 0. This code loads the IFrame Player API code asynchronously.
       var tag = document.createElement('script');
 
@@ -936,6 +939,8 @@
           const videoIdMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
           return videoIdMatch ? videoIdMatch[1] : null; // Return the video ID if found
       }
+
+      }); // End DOMContentLoaded
 
     </script>
   </body>
