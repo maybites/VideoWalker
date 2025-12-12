@@ -187,10 +187,19 @@
         align-items: center;
         justify-content: center;
         padding: 20px;
+        box-sizing: border-box;
       }
       
       #menuOverlay:not(.hidden) {
         display: flex;
+      }
+      
+      #menuOverlay .menu-buttons {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
       }
       
       #menuOverlay button {
@@ -302,11 +311,15 @@
     </div>
     
     <div id="menuOverlay" class="hidden">
-      <button id="menuRestart" data-i18n="menuRestart">Restart Experience</button>
-      <button id="menuLanguage" data-i18n="menuLanguage">Change Language</button>
-      <button id="menuImpressum" data-i18n="menuImpressum">Impressum</button>
-      <button id="menuDebug" data-i18n="menuDebug">Toggle Debug Mode</button>
-      <button id="menuClose" data-i18n="menuClose">Close Menu</button>
+      <div class="menu-buttons">
+        <button id="menuMapHome" data-i18n="menuMapHome">Map Home</button>
+        <button id="menuFullscreen" data-i18n="menuFullscreen">Toggle Fullscreen</button>
+        <button id="menuRestart" data-i18n="menuRestart">Restart Experience</button>
+        <button id="menuLanguage" data-i18n="menuLanguage">Change Language</button>
+        <button id="menuImpressum" data-i18n="menuImpressum">Impressum</button>
+        <button id="menuDebug" data-i18n="menuDebug">Toggle Debug Mode</button>
+        <button id="menuClose" data-i18n="menuClose">Close Menu</button>
+      </div>
       <div class="version-info" id="menuVersion">v1.1.4</div>
     </div>
     
@@ -365,6 +378,8 @@
           mapTitle: "Your Current Location",
           playVideoButton: "Play Video",
           closeVideoButton: "Close Video",
+          menuMapHome: "Map Home",
+          menuFullscreen: "Toggle Fullscreen",
           menuRestart: "Restart Experience",
           menuLanguage: "Change Language",
           menuImpressum: "Impressum",
@@ -386,6 +401,8 @@
           mapTitle: "Ihr aktueller Standort",
           playVideoButton: "Video abspielen",
           closeVideoButton: "Video schließen",
+          menuMapHome: "Karte zentrieren",
+          menuFullscreen: "Vollbild umschalten",
           menuRestart: "Erlebnis neu starten",
           menuLanguage: "Sprache ändern",
           menuImpressum: "Impressum",
@@ -425,6 +442,8 @@
       const videoElement = document.getElementById('locationVideo');
       const menuButton = document.getElementById('menuButton');
       const menuOverlay = document.getElementById('menuOverlay');
+      const menuMapHome = document.getElementById('menuMapHome');
+      const menuFullscreen = document.getElementById('menuFullscreen');
       const menuRestart = document.getElementById('menuRestart');
       const menuLanguage = document.getElementById('menuLanguage');
       const menuImpressum = document.getElementById('menuImpressum');
@@ -499,6 +518,29 @@
 
       // Menu - Close
       menuClose.addEventListener('click', () => {
+        menuOverlay.classList.add('hidden');
+      });
+
+      // Menu - Map Home
+      menuMapHome.addEventListener('click', () => {
+        if (map && configData && configData.defaultPosition) {
+          const { latitude, longitude, zoom } = configData.defaultPosition;
+          map.setView([latitude, longitude], zoom);
+        }
+        menuOverlay.classList.add('hidden');
+      });
+
+      // Menu - Toggle Fullscreen
+      menuFullscreen.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => {
+            console.log('Fullscreen request failed:', err);
+          });
+        } else {
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          }
+        }
         menuOverlay.classList.add('hidden');
       });
 
