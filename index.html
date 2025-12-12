@@ -147,12 +147,124 @@
         background-color: #555;
       }
       
-      #version { position: fixed; top: 10px; right: 10px; background-color: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; z-index: 1000; }
+      /* Menu button */
+      #menuButton {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        background-color: rgba(255, 255, 255, 0.9);
+        border: 2px solid #333;
+        border-radius: 50%;
+        cursor: pointer;
+        z-index: 1500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      }
+      
+      #menuButton:hover {
+        background-color: #fff;
+      }
+      
+      /* Menu overlay */
+      #menuOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.9);
+        z-index: 2500;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      
+      #menuOverlay button {
+        width: 80%;
+        max-width: 300px;
+        padding: 15px 30px;
+        margin: 10px 0;
+        font-size: 18px;
+        cursor: pointer;
+        border: 2px solid #fff;
+        background-color: transparent;
+        color: #fff;
+        border-radius: 5px;
+        transition: all 0.3s ease;
+      }
+      
+      #menuOverlay button:hover {
+        background-color: #fff;
+        color: #333;
+      }
+      
+      #menuOverlay .version-info {
+        color: #999;
+        font-size: 14px;
+        margin-top: 30px;
+      }
+      
+      /* Impressum page */
+      #impressumPage {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background-color: #fff;
+        z-index: 2000;
+        overflow-y: auto;
+        padding: 20px;
+      }
+      
+      #impressumPage .close-button {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #333;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+      }
+      
+      #impressumPage .content {
+        max-width: 800px;
+        margin: 60px auto 20px;
+      }
+      
+      /* Debug info */
+      #debugInfo {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #0f0;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 11px;
+        z-index: 1000;
+        max-width: 90%;
+      }
+      
+      #debugInfo div {
+        margin: 2px 0;
+      }
+      
       .hidden { display: none; }
     </style>
   </head>
   <body>
-    <div id="version">v1.1.4 - 2025-11-20</div>
     <div id="languagePage" class="intro-page">
       <div>
         <button class="languageButton" data-lang="en">English</button>
@@ -178,7 +290,33 @@
     </div>
 
     <div id="mapPage" class="hidden">
+      <button id="menuButton">☰</button>
       <div id="map"></div>
+    </div>
+    
+    <div id="menuOverlay" class="hidden">
+      <button id="menuRestart" data-i18n="menuRestart">Restart Experience</button>
+      <button id="menuLanguage" data-i18n="menuLanguage">Change Language</button>
+      <button id="menuImpressum" data-i18n="menuImpressum">Impressum</button>
+      <button id="menuDebug" data-i18n="menuDebug">Toggle Debug Mode</button>
+      <button id="menuClose" data-i18n="menuClose">Close Menu</button>
+      <div class="version-info" id="menuVersion">v1.1.4</div>
+    </div>
+    
+    <div id="impressumPage" class="hidden">
+      <button class="close-button" data-i18n="closeButton">Close</button>
+      <div class="content" id="impressumContent">
+        <h1 data-i18n="impressumTitle">Impressum</h1>
+        <p data-i18n="impressumText">No impressum information configured.</p>
+      </div>
+    </div>
+    
+    <div id="debugInfo" class="hidden">
+      <div id="debugLat">Lat: --</div>
+      <div id="debugLng">Lng: --</div>
+      <div id="debugAcc">Accuracy: --</div>
+      <div id="debugUpdates">Updates: 0</div>
+      <div id="debugNearest">Nearest: --</div>
     </div>
     
     <div id="videoPage" class="hidden">
@@ -216,7 +354,15 @@
           consentButton: "Accept and Continue",
           mapTitle: "Your Current Location",
           playVideoButton: "Play Video",
-          closeVideoButton: "Close Video"
+          closeVideoButton: "Close Video",
+          menuRestart: "Restart Experience",
+          menuLanguage: "Change Language",
+          menuImpressum: "Impressum",
+          menuDebug: "Toggle Debug Mode",
+          menuClose: "Close Menu",
+          closeButton: "Close",
+          impressumTitle: "Impressum",
+          impressumText: "No impressum information configured."
         },
         de: {
           fullscreenTitle: "VideoWalk Erlebnis",
@@ -229,11 +375,20 @@
           consentButton: "Akzeptieren und Fortfahren",
           mapTitle: "Ihr aktueller Standort",
           playVideoButton: "Video abspielen",
-          closeVideoButton: "Video schließen"
+          closeVideoButton: "Video schließen",
+          menuRestart: "Erlebnis neu starten",
+          menuLanguage: "Sprache ändern",
+          menuImpressum: "Impressum",
+          menuDebug: "Debug-Modus umschalten",
+          menuClose: "Menü schließen",
+          closeButton: "Schließen",
+          impressumTitle: "Impressum",
+          impressumText: "Keine Impressum-Informationen konfiguriert."
         }
       };
 
       let selectedLanguage = 'en';
+      let debugMode = false;
 
       let configData = null;
       let videosData = [];
@@ -258,6 +413,16 @@
       const videoPage = document.getElementById('videoPage');
       const closeVideoButton = document.getElementById('closeVideo');
       const videoElement = document.getElementById('locationVideo');
+      const menuButton = document.getElementById('menuButton');
+      const menuOverlay = document.getElementById('menuOverlay');
+      const menuRestart = document.getElementById('menuRestart');
+      const menuLanguage = document.getElementById('menuLanguage');
+      const menuImpressum = document.getElementById('menuImpressum');
+      const menuDebug = document.getElementById('menuDebug');
+      const menuClose = document.getElementById('menuClose');
+      const menuVersion = document.getElementById('menuVersion');
+      const impressumPage = document.getElementById('impressumPage');
+      const debugInfo = document.getElementById('debugInfo');
 
       // Translation function
       function t(key) {
@@ -316,6 +481,81 @@
         }, 100);
       });
 
+      // Menu button - open menu
+      menuButton.addEventListener('click', () => {
+        menuOverlay.classList.remove('hidden');
+      });
+
+      // Menu - Close
+      menuClose.addEventListener('click', () => {
+        menuOverlay.classList.add('hidden');
+      });
+
+      // Menu - Restart
+      menuRestart.addEventListener('click', () => {
+        location.reload();
+      });
+
+      // Menu - Change Language
+      menuLanguage.addEventListener('click', () => {
+        menuOverlay.classList.add('hidden');
+        mapPage.classList.add('hidden');
+        languagePage.classList.remove('hidden');
+        // Stop location tracking
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+        }
+      });
+
+      // Menu - Impressum
+      menuImpressum.addEventListener('click', () => {
+        menuOverlay.classList.add('hidden');
+        impressumPage.classList.remove('hidden');
+        loadImpressum();
+      });
+
+      // Menu - Toggle Debug
+      menuDebug.addEventListener('click', () => {
+        debugMode = !debugMode;
+        if (debugMode) {
+          debugInfo.classList.remove('hidden');
+        } else {
+          debugInfo.classList.add('hidden');
+        }
+        menuOverlay.classList.add('hidden');
+      });
+
+      // Close Impressum
+      document.querySelector('#impressumPage .close-button').addEventListener('click', () => {
+        impressumPage.classList.add('hidden');
+      });
+
+      // Load impressum content from config
+      function loadImpressum() {
+        const impressumContent = document.getElementById('impressumContent');
+        if (configData && configData.impressum) {
+          const content = configData.impressum[selectedLanguage] || configData.impressum['en'] || configData.impressum;
+          if (typeof content === 'string') {
+            impressumContent.innerHTML = '<h1>' + t('impressumTitle') + '</h1><div>' + content + '</div>';
+          } else {
+            impressumContent.innerHTML = '<h1>' + t('impressumTitle') + '</h1><p>' + t('impressumText') + '</p>';
+          }
+        } else {
+          impressumContent.innerHTML = '<h1>' + t('impressumTitle') + '</h1><p>' + t('impressumText') + '</p>';
+        }
+      }
+
+      // Update debug info
+      function updateDebugInfo(lat, lng, accuracy) {
+        if (debugMode) {
+          document.getElementById('debugLat').textContent = 'Lat: ' + lat.toFixed(6);
+          document.getElementById('debugLng').textContent = 'Lng: ' + lng.toFixed(6);
+          document.getElementById('debugAcc').textContent = 'Accuracy: ' + accuracy.toFixed(1) + 'm';
+          document.getElementById('debugUpdates').textContent = 'Updates: ' + locationUpdateCount;
+        }
+      }
+
       // Step -1: Language Selection
       languageButtons.forEach(button => {
         button.addEventListener('click', () => {
@@ -358,6 +598,12 @@
           .then(data => {
             configData = data;
             videosData = data.locations || data;
+            
+            // Set version from config if available
+            if (configData.version) {
+              menuVersion.textContent = 'v' + configData.version;
+            }
+            
             initMap(); // Initialize the map with default position from config
             addVideoLocationsToMap(); // Add locations to map
             getUserLocation(); // Start tracking location after everything is set up
@@ -415,9 +661,12 @@
         
         // callback function on success by geolocation.watchPosition
         function success(position) {
-          const { latitude, longitude } = position.coords;
+          const { latitude, longitude, accuracy } = position.coords;
           locationUpdateCount++;
           console.log('Location updated:', latitude, longitude, '(Update #' + locationUpdateCount + ')');
+          
+          // Update debug info
+          updateDebugInfo(latitude, longitude, accuracy);
           
           // Skip location updates and proximity checks while video is playing
           if (isVideoPlaying) {
@@ -540,8 +789,18 @@
 
       // Step 7: Check proximity to a video location and show popup if in range
       function checkProximity(latitude, longitude) {
+        let nearestDistance = Infinity;
+        let nearestIndex = -1;
+        
         videosData.forEach((video, index) => {
           const distance = map.distance([latitude, longitude], [video.latitude, video.longitude]);
+          
+          // Track nearest location for debug info
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestIndex = index;
+          }
+          
           if (distance <= video.radius) {
             // User is inside a perimeter - open the popup
             const circleData = videoCircles[index];
@@ -550,6 +809,12 @@
             }
           }
         });
+        
+        // Update debug info with nearest location
+        if (debugMode && nearestIndex >= 0) {
+          const nearestTitle = videosData[nearestIndex].title[selectedLanguage] || videosData[nearestIndex].title['en'] || 'Location ' + (nearestIndex + 1);
+          document.getElementById('debugNearest').textContent = 'Nearest: ' + nearestTitle + ' (' + nearestDistance.toFixed(1) + 'm)';
+        }
       }
 
       // Play video from popup button (global function for onclick)

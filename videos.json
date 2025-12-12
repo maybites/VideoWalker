@@ -1,4 +1,9 @@
 {
+  "version": "1.2.0",
+  "impressum": {
+    "en": "<p><strong>VideoWalker</strong></p><p>An interactive location-based video experience.</p><p>For more information, visit our website.</p>",
+    "de": "<p><strong>VideoWalker</strong></p><p>Ein interaktives standortbasiertes Video-Erlebnis.</p><p>Weitere Informationen finden Sie auf unserer Website.</p>"
+  },
   "defaultPosition": {
     "latitude": 47.3911,
     "longitude": 8.5118,
