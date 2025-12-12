@@ -992,7 +992,7 @@
       // Step 9: Play video (handles delayed video loading)
       function playVideo(videoUrl) {
         const videoId = extractVideoId(videoUrl);
-        if (isPlayerReady) {
+        if (isPlayerReady && player) {
           player.loadVideoById(videoId);
         } else {
           videoToLoad = videoUrl; // Queue video for later if player is not ready
@@ -1006,8 +1006,9 @@
       // Stop video playback
       function stopVideo() {
         if (player && typeof player.stopVideo === 'function') {
-          player.stopVideo(); // Stop the video playback
+          player.stopVideo();
         }
+        isVideoPlaying = false;
       }
 
       /***********************/
@@ -1092,8 +1093,8 @@
 
       // Utility function to extract video ID from various YouTube URL formats
       function extractVideoId(url) {
-          const videoIdMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-          return videoIdMatch ? videoIdMatch[1] : null; // Return the video ID if found
+        const videoIdMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        return videoIdMatch ? videoIdMatch[1] : null;
       }
 
       }); // End DOMContentLoaded
