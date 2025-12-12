@@ -393,6 +393,7 @@
       <button id="closeVideo" data-i18n="closeVideoButton">Close Video</button>
       <div id="videoContainer">
         <div id="player"></div> <!-- YouTube IFrame API will replace this div with the video player -->
+        <div id="vimeoPlayer"></div> <!-- Vimeo Player will be initialized here -->
       </div>
     </div>
 
@@ -400,12 +401,15 @@
     <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame API -->
+    <script src="https://player.vimeo.com/api/player.js"></script> <!-- Vimeo Player API -->
     <script>
       // YouTube player variables (must be global for YouTube API callback)
       var player;
       var videoToLoad = null;
       var isPlayerReady = false;
       var isVideoPlaying = false;
+      var vimeoPlayer = null;
+      var currentVideoType = null; // 'youtube' or 'vimeo'
 
       // Wait for DOM to be fully loaded
       document.addEventListener('DOMContentLoaded', function() {
@@ -993,22 +997,84 @@
 
       // Step 9: Play video (handles delayed video loading)
       function playVideo(videoUrl) {
-        const videoId = extractVideoId(videoUrl);
-        if (isPlayerReady && player) {
-          player.loadVideoById(videoId);
+        const videoType = detectVideoType(videoUrl);
+        currentVideoType = videoType;
+        
+        if (videoType === 'youtube') {
+          playYouTubeVideo(videoUrl);
+        } else if (videoType === 'vimeo') {
+          playVimeoVideo(videoUrl);
         } else {
-          videoToLoad = videoUrl; // Queue video for later if player is not ready
+          console.error('Unsupported video type:', videoUrl);
+          alert('Unsupported video URL format');
+          return;
         }
+        
         // Show video page, hide map page
         mapPage.classList.add('hidden');
         menuButton.classList.remove('show'); // Hide menu button during video
         videoPage.classList.remove('hidden');
       }
+      
+      function playYouTubeVideo(videoUrl) {
+        const videoId = extractYouTubeId(videoUrl);
+        
+        // Hide Vimeo player, show YouTube player
+        document.getElementById('vimeoPlayer').style.display = 'none';
+        document.getElementById('player').style.display = 'block';
+        
+        if (isPlayerReady && player) {
+          player.loadVideoById(videoId);
+        } else {
+          videoToLoad = videoUrl; // Queue video for later if player is not ready
+        }
+      }
+      
+      function playVimeoVideo(videoUrl) {
+        const videoId = extractVimeoId(videoUrl);
+        
+        // Hide YouTube player, show Vimeo player
+        document.getElementById('player').style.display = 'none';
+        document.getElementById('vimeoPlayer').style.display = 'block';
+        
+        // Destroy existing Vimeo player if it exists
+        if (vimeoPlayer) {
+          vimeoPlayer.destroy();
+        }
+        
+        // Create new Vimeo player
+        vimeoPlayer = new Vimeo.Player('vimeoPlayer', {
+          id: videoId,
+          width: 640,
+          autoplay: true
+        });
+        
+        vimeoPlayer.on('play', function() {
+          isVideoPlaying = true;
+          console.log('Vimeo video started playing - location updates paused');
+        });
+        
+        vimeoPlayer.on('ended', function() {
+          isVideoPlaying = false;
+          console.log('Vimeo video ended - resuming location updates');
+        });
+        
+        vimeoPlayer.on('error', function(error) {
+          console.error('Vimeo player error:', error);
+          alert('Failed to load the Vimeo video. Please try again later.');
+        });
+      }
 
       // Stop video playback
       function stopVideo() {
-        if (player && typeof player.stopVideo === 'function') {
-          player.stopVideo();
+        if (currentVideoType === 'youtube') {
+          if (player && typeof player.stopVideo === 'function') {
+            player.stopVideo();
+          }
+        } else if (currentVideoType === 'vimeo') {
+          if (vimeoPlayer) {
+            vimeoPlayer.pause();
+          }
         }
         isVideoPlaying = false;
       }
@@ -1038,9 +1104,25 @@
       /**    YOUTUBE API    **/
       /**                   **/
 
-      // Utility function to extract video ID from various YouTube URL formats
-      function extractVideoId(url) {
+      // Detect video type from URL
+      function detectVideoType(url) {
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+          return 'youtube';
+        } else if (url.includes('vimeo.com')) {
+          return 'vimeo';
+        }
+        return null;
+      }
+      
+      // Extract YouTube video ID from various URL formats
+      function extractYouTubeId(url) {
         const videoIdMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        return videoIdMatch ? videoIdMatch[1] : null;
+      }
+      
+      // Extract Vimeo video ID from various URL formats
+      function extractVimeoId(url) {
+        const videoIdMatch = url.match(/(?:https?:\/\/)?(?:www\.)?vimeo\.com\/(\d+)/);
         return videoIdMatch ? videoIdMatch[1] : null;
       }
 
@@ -1078,7 +1160,7 @@
       function onPlayerReady(event) {
         isPlayerReady = true;
         if (videoToLoad) {
-          const videoId = extractVideoId(videoToLoad);
+          const videoId = extractYouTubeId(videoToLoad);
           console.log('Extracted video ID:', videoId);
           if (videoId && videoId.length === 11) {
             player.loadVideoById(videoId);
