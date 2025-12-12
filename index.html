@@ -3,6 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- iOS Web App support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VideoWalker" />
+    
     <title>Location-Based YouTube Video Playback</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.3/gh-fork-ribbon.min.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
@@ -320,8 +326,8 @@
       <div class="menu-buttons">
         <button id="menuMapHome" data-i18n="menuMapHome">Map Home</button>
         <button id="menuFullscreen" data-i18n="menuFullscreen">Toggle Fullscreen</button>
-        <button id="menuRestart" data-i18n="menuRestart">Restart Experience</button>
         <button id="menuLanguage" data-i18n="menuLanguage">Change Language</button>
+        <button id="menuRestart" data-i18n="menuRestart">Restart Experience</button>
         <button id="menuImpressum" data-i18n="menuImpressum">Impressum</button>
         <button id="menuDebug" data-i18n="menuDebug">Toggle Debug Mode</button>
         <button id="menuClose" data-i18n="menuClose">Close Menu</button>
@@ -413,7 +419,7 @@
           menuLanguage: "Language: English",
           menuImpressum: "Impressum",
           menuDebug: "Toggle Debug Mode",
-          menuClose: "Close Menu",
+          menuClose: "Close",
           closeButton: "Close",
           impressumTitle: "Impressum",
           impressumText: "No impressum information configured."
@@ -436,7 +442,7 @@
           menuLanguage: "Sprache: Deutsch",
           menuImpressum: "Impressum",
           menuDebug: "Debug-Modus umschalten",
-          menuClose: "Menü schließen",
+          menuClose: "Schließen",
           closeButton: "Schließen",
           impressumTitle: "Impressum",
           impressumText: "Keine Impressum-Informationen konfiguriert."
@@ -561,17 +567,60 @@
 
       // Menu - Toggle Fullscreen
       menuFullscreen.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(err => {
-            console.log('Fullscreen request failed:', err);
-          });
+        // Check if already in fullscreen (various vendor prefixes)
+        const isFullscreen = document.fullscreenElement || 
+                           document.webkitFullscreenElement || 
+                           document.mozFullScreenElement || 
+                           document.msFullscreenElement;
+        
+        if (!isFullscreen) {
+          // Enter fullscreen
+          const elem = document.documentElement;
+          
+          if (elem.requestFullscreen) {
+            elem.requestFullscreen().catch(err => {
+              console.log('Fullscreen request failed:', err);
+              showFullscreenMessage();
+            });
+          } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen().catch(err => {
+              console.log('Webkit fullscreen request failed:', err);
+              showFullscreenMessage();
+            });
+          } else if (elem.webkitEnterFullscreen) {
+            elem.webkitEnterFullscreen().catch(err => {
+              console.log('Webkit enter fullscreen request failed:', err);
+              showFullscreenMessage();
+            });
+          } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen().catch(err => {
+              console.log('MS fullscreen request failed:', err);
+            });
+          } else {
+            showFullscreenMessage();
+          }
         } else {
+          // Exit fullscreen
           if (document.exitFullscreen) {
             document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+          } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
           }
         }
         menuOverlay.classList.add('hidden');
       });
+      
+      // Show message for iOS users about fullscreen limitations
+      function showFullscreenMessage() {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS) {
+          alert('iOS Safari does not support fullscreen mode for web pages. For a fullscreen experience, add this page to your home screen and open it from there.');
+        }
+      }
 
       // Menu - Restart
       menuRestart.addEventListener('click', () => {
@@ -659,14 +708,26 @@
       // Step 0: Enter Fullscreen and transition to Info Page
       enterFullscreenButton.addEventListener('click', () => {
         const elem = document.documentElement;
+        
+        // Try standard fullscreen API
         if (elem.requestFullscreen) {
           elem.requestFullscreen().catch(err => {
             console.log('Fullscreen request failed:', err);
-            // Continue to next page even if fullscreen fails
-            fullscreenPage.classList.add('hidden');
-            infoPage.classList.remove('hidden');
+          });
+        } 
+        // Try webkit fullscreen (iOS Safari)
+        else if (elem.webkitRequestFullscreen) {
+          elem.webkitRequestFullscreen().catch(err => {
+            console.log('Webkit fullscreen request failed:', err);
           });
         }
+        // Try webkit enter fullscreen (older iOS)
+        else if (elem.webkitEnterFullscreen) {
+          elem.webkitEnterFullscreen().catch(err => {
+            console.log('Webkit enter fullscreen request failed:', err);
+          });
+        }
+        
         // Transition to info page
         fullscreenPage.classList.add('hidden');
         infoPage.classList.remove('hidden');
