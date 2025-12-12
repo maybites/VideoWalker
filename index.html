@@ -410,7 +410,7 @@
           menuMapHome: "Map Home",
           menuFullscreen: "Toggle Fullscreen",
           menuRestart: "Restart Experience",
-          menuLanguage: "Change Language",
+          menuLanguage: "Language: English",
           menuImpressum: "Impressum",
           menuDebug: "Toggle Debug Mode",
           menuClose: "Close Menu",
@@ -433,7 +433,7 @@
           menuMapHome: "Karte zentrieren",
           menuFullscreen: "Vollbild umschalten",
           menuRestart: "Erlebnis neu starten",
-          menuLanguage: "Sprache ändern",
+          menuLanguage: "Sprache: Deutsch",
           menuImpressum: "Impressum",
           menuDebug: "Debug-Modus umschalten",
           menuClose: "Menü schließen",
@@ -580,15 +580,20 @@
 
       // Menu - Change Language
       menuLanguage.addEventListener('click', () => {
+        // Cycle through available languages
+        const languages = Object.keys(translations);
+        const currentIndex = languages.indexOf(selectedLanguage);
+        const nextIndex = (currentIndex + 1) % languages.length;
+        selectedLanguage = languages[nextIndex];
+        
+        // Update all UI text
+        updateLanguage();
+        
+        // Update menu version display with current language indicator
+        const langNames = { en: 'English', de: 'Deutsch' };
+        menuVersion.textContent = (configData?.version ? 'v' + configData.version : 'v1.2.0') + ' - ' + (langNames[selectedLanguage] || selectedLanguage.toUpperCase());
+        
         menuOverlay.classList.add('hidden');
-        mapPage.classList.add('hidden');
-        menuButton.classList.remove('show'); // Hide menu button
-        languagePage.classList.remove('hidden');
-        // Stop location tracking
-        if (watchId !== null) {
-          navigator.geolocation.clearWatch(watchId);
-          watchId = null;
-        }
       });
 
       // Menu - Impressum
