@@ -1,18 +1,24 @@
-[
-  {
-    "videoUrl": "https://www.youtube.com/embed/ulaFky_zUII",
-    "latitude": 47.3902729,
-    "longitude": 8.5107042,
-    "radius": 20,
-    "title": {
-      "en": "Location 1",
-      "de": "Standort 1"
-    },
-    "description": {
-      "en": "First video location - 20m radius",
-      "de": "Erster Video-Standort - 20m Radius"
-    }
+{
+  "defaultPosition": {
+    "latitude": 47.3911,
+    "longitude": 8.5118,
+    "zoom": 15
   },
+  "locations": [
+    {
+      "videoUrl": "https://www.youtube.com/embed/ulaFky_zUII",
+      "latitude": 47.3902729,
+      "longitude": 8.5107042,
+      "radius": 20,
+      "title": {
+        "en": "Location 1",
+        "de": "Standort 1"
+      },
+      "description": {
+        "en": "First video location - 20m radius",
+        "de": "Erster Video-Standort - 20m Radius"
+      }
+    },
   {
     "videoUrl": "https://www.youtube.com/embed/XM_umIS7b-w",
     "latitude": 47.3920324,
@@ -55,4 +61,5 @@
       "de": "Vierter Video-Standort - 20m Radius"
     }
   }
-]
+  ]
+}
