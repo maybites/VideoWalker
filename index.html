@@ -7,7 +7,7 @@
     <!-- iOS Web App support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="VideoWalker" />
+    <meta name="apple-mobile-web-app-title" content="VideoWalk" />
     
     <title>Location-Based YouTube Video Playback</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.3/gh-fork-ribbon.min.css" />
@@ -289,6 +289,44 @@
         margin: 2px 0;
       }
       
+      /* iOS Install Prompt */
+      #iosInstallPrompt {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: rgba(0, 0, 0, 0.95);
+        color: white;
+        padding: 20px;
+        text-align: center;
+        z-index: 3000;
+        font-size: 14px;
+        line-height: 1.6;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+      }
+      
+      #iosInstallPrompt strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 16px;
+      }
+      
+      #iosInstallPrompt button {
+        margin-top: 15px;
+        padding: 10px 30px;
+        background-color: #fff;
+        color: #333;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+      }
+      
+      #iosInstallPrompt button:hover {
+        background-color: #f0f0f0;
+      }
+      
       .hidden { display: none; }
     </style>
   </head>
@@ -422,7 +460,10 @@
           menuClose: "Close",
           closeButton: "Close",
           impressumTitle: "Impressum",
-          impressumText: "No impressum information configured."
+          impressumText: "No impressum information configured.",
+          iosInstallTitle: "Install VideoWalk",
+          iosInstallText: "For the best experience, add this app to your home screen:<br>Tap <strong>Share</strong> <span style='font-size:18px'>⬆️</span> then <strong>Add to Home Screen</strong>",
+          iosInstallDismiss: "Got it"
         },
         de: {
           fullscreenTitle: "VideoWalk Erlebnis",
@@ -445,7 +486,10 @@
           menuClose: "Schließen",
           closeButton: "Schließen",
           impressumTitle: "Impressum",
-          impressumText: "Keine Impressum-Informationen konfiguriert."
+          impressumText: "Keine Impressum-Informationen konfiguriert.",
+          iosInstallTitle: "VideoWalk installieren",
+          iosInstallText: "Für das beste Erlebnis fügen Sie diese App zu Ihrem Startbildschirm hinzu:<br>Tippen Sie auf <strong>Teilen</strong> <span style='font-size:18px'>⬆️</span> dann <strong>Zum Home-Bildschirm</strong>",
+          iosInstallDismiss: "Verstanden"
         }
       };
 
@@ -567,60 +611,17 @@
 
       // Menu - Toggle Fullscreen
       menuFullscreen.addEventListener('click', () => {
-        // Check if already in fullscreen (various vendor prefixes)
-        const isFullscreen = document.fullscreenElement || 
-                           document.webkitFullscreenElement || 
-                           document.mozFullScreenElement || 
-                           document.msFullscreenElement;
-        
-        if (!isFullscreen) {
-          // Enter fullscreen
-          const elem = document.documentElement;
-          
-          if (elem.requestFullscreen) {
-            elem.requestFullscreen().catch(err => {
-              console.log('Fullscreen request failed:', err);
-              showFullscreenMessage();
-            });
-          } else if (elem.webkitRequestFullscreen) {
-            elem.webkitRequestFullscreen().catch(err => {
-              console.log('Webkit fullscreen request failed:', err);
-              showFullscreenMessage();
-            });
-          } else if (elem.webkitEnterFullscreen) {
-            elem.webkitEnterFullscreen().catch(err => {
-              console.log('Webkit enter fullscreen request failed:', err);
-              showFullscreenMessage();
-            });
-          } else if (elem.msRequestFullscreen) {
-            elem.msRequestFullscreen().catch(err => {
-              console.log('MS fullscreen request failed:', err);
-            });
-          } else {
-            showFullscreenMessage();
-          }
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => {
+            console.log('Fullscreen request failed:', err);
+          });
         } else {
-          // Exit fullscreen
           if (document.exitFullscreen) {
             document.exitFullscreen();
-          } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-          } else if (document.mozCancelFullScreen) {
-            document.mozCancelFullScreen();
-          } else if (document.msExitFullscreen) {
-            document.msExitFullscreen();
           }
         }
         menuOverlay.classList.add('hidden');
       });
-      
-      // Show message for iOS users about fullscreen limitations
-      function showFullscreenMessage() {
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        if (isIOS) {
-          alert('iOS Safari does not support fullscreen mode for web pages. For a fullscreen experience, add this page to your home screen and open it from there.');
-        }
-      }
 
       // Menu - Restart
       menuRestart.addEventListener('click', () => {
@@ -700,34 +701,48 @@
         button.addEventListener('click', () => {
           selectedLanguage = button.getAttribute('data-lang');
           updateLanguage();
+          checkiOSInstallPrompt(); // Check and show iOS install prompt
           languagePage.classList.add('hidden');
           fullscreenPage.classList.remove('hidden');
         });
       });
 
+      // Check if iOS and show install prompt
+      function checkiOSInstallPrompt() {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+        const hasSeenPrompt = localStorage.getItem('iosInstallPromptSeen');
+        
+        if (isIOS && !isStandalone && !hasSeenPrompt) {
+          // Delay showing the prompt slightly to ensure language is set
+          setTimeout(showIOSInstallPrompt, 500);
+        }
+      }
+
+      function showIOSInstallPrompt() {
+        const promptDiv = document.createElement('div');
+        promptDiv.id = 'iosInstallPrompt';
+        promptDiv.innerHTML = `
+          <div><strong>${t('iosInstallTitle')}</strong></div>
+          <div>${t('iosInstallText')}</div>
+          <button id="dismissIOSPrompt">${t('iosInstallDismiss')}</button>
+        `;
+        document.body.appendChild(promptDiv);
+        
+        document.getElementById('dismissIOSPrompt').addEventListener('click', () => {
+          promptDiv.remove();
+          localStorage.setItem('iosInstallPromptSeen', 'true');
+        });
+      }
+
       // Step 0: Enter Fullscreen and transition to Info Page
       enterFullscreenButton.addEventListener('click', () => {
         const elem = document.documentElement;
-        
-        // Try standard fullscreen API
         if (elem.requestFullscreen) {
           elem.requestFullscreen().catch(err => {
             console.log('Fullscreen request failed:', err);
           });
-        } 
-        // Try webkit fullscreen (iOS Safari)
-        else if (elem.webkitRequestFullscreen) {
-          elem.webkitRequestFullscreen().catch(err => {
-            console.log('Webkit fullscreen request failed:', err);
-          });
         }
-        // Try webkit enter fullscreen (older iOS)
-        else if (elem.webkitEnterFullscreen) {
-          elem.webkitEnterFullscreen().catch(err => {
-            console.log('Webkit enter fullscreen request failed:', err);
-          });
-        }
-        
         // Transition to info page
         fullscreenPage.classList.add('hidden');
         infoPage.classList.remove('hidden');
