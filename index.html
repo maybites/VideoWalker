@@ -524,6 +524,7 @@
       let configData = null;
       let videosData = [];
       let videoCircles = []; // Store circles to update popups when language changes
+      let userWithinLocations = new Set(); // Track which location indices user is currently within
       let map, userMarker;
       let watchId = null; // Store the watch ID
       let locationUpdateCount = 0; // Counter for location updates
@@ -571,12 +572,12 @@
 
       // Update popup content based on selected language
       function updatePopupContent() {
-        videoCircles.forEach(circleData => {
+        videoCircles.forEach((circleData, index) => {
           const { circle, video } = circleData;
           const { title, description, videoUrl } = video;
           const videoTitle = typeof title === 'object' ? (title[selectedLanguage] || title.en) : title;
           const videoDescription = typeof description === 'object' ? (description[selectedLanguage] || description.en) : description;
-          
+
           if (videoTitle || videoDescription) {
             let popupContent = '';
             if (videoTitle) {
@@ -585,7 +586,10 @@
             if (videoDescription) {
               popupContent += videoTitle ? `<br>${videoDescription}` : videoDescription;
             }
-            popupContent += `<br><button class="popup-play-button" onclick="playVideoFromPopup('${videoUrl}')">${t('playVideoButton')}</button>`;
+            // Only show play button if in debug mode OR user is within location radius
+            if (debugMode || userWithinLocations.has(index)) {
+              popupContent += `<br><button class="popup-play-button" onclick="playVideoFromPopup('${videoUrl}')">${t('playVideoButton')}</button>`;
+            }
             circle.setPopupContent(popupContent);
           }
         });
@@ -725,6 +729,8 @@
         } else {
           debugInfo.classList.add('hidden');
         }
+        // Update popup content to show/hide play buttons based on new debug mode state
+        updatePopupContent();
         menuOverlay.classList.add('hidden');
       });
 
@@ -828,12 +834,19 @@
           .then(data => {
             configData = data;
             videosData = data.locations || data;
-            
+
             // Set version from config if available
             if (configData.version) {
               menuVersion.textContent = 'v' + configData.version;
             }
-            
+
+            // Conditionally show/hide debug toggle button based on config
+            if (configData.showDebugToggle === false) {
+              menuDebug.style.display = 'none';
+            } else {
+              menuDebug.style.display = 'block';
+            }
+
             initMap(); // Initialize the map with default position from config
             addVideoLocationsToMap(); // Add locations to map
             getUserLocation(); // Start tracking location after everything is set up
@@ -982,11 +995,11 @@
               color: 'red',
               radius: radius
             }).addTo(map);
-            
-            // Add popup with title, description, and play button
+
+            // Add popup with title, description, and conditionally play button
             const videoTitle = typeof title === 'object' ? (title[selectedLanguage] || title.en) : title;
             const videoDescription = typeof description === 'object' ? (description[selectedLanguage] || description.en) : description;
-            
+
             if (videoTitle || videoDescription) {
               let popupContent = '';
               if (videoTitle) {
@@ -995,14 +1008,17 @@
               if (videoDescription) {
                 popupContent += videoTitle ? `<br>${videoDescription}` : videoDescription;
               }
-              popupContent += `<br><button class="popup-play-button" onclick="playVideoFromPopup('${video.videoUrl}')">${t('playVideoButton')}</button>`;
+              // Only show play button if in debug mode OR user is within location radius
+              if (debugMode || userWithinLocations.has(index)) {
+                popupContent += `<br><button class="popup-play-button" onclick="playVideoFromPopup('${video.videoUrl}')">${t('playVideoButton')}</button>`;
+              }
               circle.bindPopup(popupContent);
-              
+
               // Explicitly add tap event for mobile devices
               circle.on('click', function(e) {
                 this.openPopup();
               });
-              
+
               // Store circle and video data for later updates
               videoCircles.push({ circle, video });
             }
@@ -1021,25 +1037,47 @@
       function checkProximity(latitude, longitude) {
         let nearestDistance = Infinity;
         let nearestIndex = -1;
-        
+        const previousWithinLocations = new Set(userWithinLocations);
+        userWithinLocations.clear();
+
         videosData.forEach((video, index) => {
           const distance = map.distance([latitude, longitude], [video.latitude, video.longitude]);
-          
+
           // Track nearest location for debug info
           if (distance < nearestDistance) {
             nearestDistance = distance;
             nearestIndex = index;
           }
-          
+
           if (distance <= video.radius) {
-            // User is inside a perimeter - open the popup
+            // User is inside this perimeter
+            userWithinLocations.add(index);
+            // Open the popup
             const circleData = videoCircles[index];
             if (circleData && circleData.circle) {
               circleData.circle.openPopup();
             }
           }
         });
-        
+
+        // Check if proximity has changed
+        let proximityChanged = false;
+        if (previousWithinLocations.size !== userWithinLocations.size) {
+          proximityChanged = true;
+        } else {
+          for (let index of userWithinLocations) {
+            if (!previousWithinLocations.has(index)) {
+              proximityChanged = true;
+              break;
+            }
+          }
+        }
+
+        // Update popup content if proximity changed
+        if (proximityChanged) {
+          updatePopupContent();
+        }
+
         // Update debug info with nearest location
         if (debugMode && nearestIndex >= 0) {
           const nearestTitle = videosData[nearestIndex].title[selectedLanguage] || videosData[nearestIndex].title['en'] || 'Location ' + (nearestIndex + 1);
