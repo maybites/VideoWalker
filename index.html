@@ -1049,13 +1049,20 @@
             nearestIndex = index;
           }
 
+          const circleData = videoCircles[index];
           if (distance <= video.radius) {
             // User is inside this perimeter
             userWithinLocations.add(index);
-            // Open the popup
-            const circleData = videoCircles[index];
+            // Change circle color to green
             if (circleData && circleData.circle) {
+              circleData.circle.setStyle({ color: 'green' });
               circleData.circle.openPopup();
+            }
+          } else {
+            // User is outside this perimeter
+            // Change circle color back to red
+            if (circleData && circleData.circle) {
+              circleData.circle.setStyle({ color: 'red' });
             }
           }
         });
