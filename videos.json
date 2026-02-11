@@ -11,9 +11,9 @@
   },
   "locations": [
     {
-      "videoUrl": "https://www.youtube.com/embed/ulaFky_zUII",
-      "latitude": 47.3902729,
-      "longitude": 8.5107042,
+      "videoUrl": " https://vimeo.com/116365465",
+      "latitude": 47.3906279,
+      "longitude": 8.5102713,
       "radius": 20,
       "title": {
         "en": "Location 1",
@@ -25,7 +25,7 @@
       }
     },
   {
-    "videoUrl": "https://www.youtube.com/embed/XM_umIS7b-w",
+    "videoUrl": "https://vimeo.com/1163654986",
     "latitude": 47.3920324,
     "longitude": 8.5118911,
     "radius": 20,
@@ -39,7 +39,7 @@
     }
   },
   {
-    "videoUrl": "https://www.youtube.com/embed/Hm3JodBR-vs",
+    "videoUrl": "https://vimeo.com/1163655114",
     "latitude": 47.391649,
     "longitude": 8.513339,
     "radius": 10,
@@ -53,7 +53,7 @@
     }
   },
   {
-    "videoUrl": "https://vimeo.com/745848092",
+    "videoUrl": "https://vimeo.com/1163655235",
     "latitude": 47.390331,
     "longitude": 8.512387,
     "radius": 20,
