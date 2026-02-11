@@ -138,28 +138,27 @@
       }
 
       #vimeoPlayer iframe {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
         width: 100%;
-        height: 100%;
-        aspect-ratio: 16 / 9;
+        height: 56.25%; /* 16:9 aspect ratio: 9/16 = 0.5625 */
+        max-width: 177.78%; /* Allow width to exceed if height is constrained: 16/9 = 1.7778 */
+        max-height: 100%;
       }
 
-      /* Ensure video scales properly in portrait mode */
-      @media (orientation: portrait) {
+      /* Adjust for portrait orientation */
+      @media (max-aspect-ratio: 16/9) {
         #vimeoPlayer iframe {
           width: 100%;
           height: auto;
+          aspect-ratio: 16 / 9;
         }
       }
 
-      /* Ensure video scales properly in landscape mode */
-      @media (orientation: landscape) {
+      /* Adjust for landscape orientation */
+      @media (min-aspect-ratio: 16/9) {
         #vimeoPlayer iframe {
           width: auto;
           height: 100%;
+          aspect-ratio: 16 / 9;
         }
       }
       
