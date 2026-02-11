@@ -1069,7 +1069,10 @@
         vimeoPlayer = new Vimeo.Player('vimeoPlayer', {
           id: videoId,
           responsive: true,
-          autoplay: true
+          autoplay: true,
+          byline: false,      // Hide author name
+          portrait: false,    // Hide author profile image
+          title: false        // Hide video title
         });
         
         vimeoPlayer.on('play', function() {
@@ -1155,7 +1158,15 @@
         player = new YT.Player('player', {
           height: '315',
           width: '100%',
-          playerVars: { 'autoplay': 1, 'controls': 1 },
+          playerVars: {
+            'autoplay': 1,
+            'controls': 1,
+            'modestbranding': 1,  // Minimize YouTube branding
+            'rel': 0,              // Don't show related videos from other channels at end
+            'iv_load_policy': 3,   // Hide video annotations
+            'disablekb': 0,        // Keep keyboard controls enabled
+            'fs': 1                // Show fullscreen button
+          },
           events: {
             'onReady': onPlayerReady,
             'onError': onPlayerError,
