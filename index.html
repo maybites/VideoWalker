@@ -719,6 +719,9 @@
         debugMode = !debugMode;
         if (debugMode) {
           debugInfo.classList.remove('hidden');
+          // Clear iOS install prompt flag when entering debug mode
+          localStorage.removeItem('iosInstallPromptSeen');
+          console.log('Debug mode enabled - iOS install prompt flag cleared');
         } else {
           debugInfo.classList.add('hidden');
         }
