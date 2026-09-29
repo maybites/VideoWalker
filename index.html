@@ -402,6 +402,7 @@
       <div id="debugLng">Lng: --</div>
       <div id="debugAcc">Accuracy: --</div>
       <div id="debugUpdates">Updates: 0</div>
+      <div id="debugGps">GPS: --</div>
       <div id="debugNearest">Nearest: --</div>
       <div id="debugAudio">Audio: --</div>
     </div>
@@ -769,14 +770,12 @@
         }
       }
 
-      // Update debug info
+      // Update debug info (also while hidden, so it is current when debug mode is switched on)
       function updateDebugInfo(lat, lng, accuracy) {
-        if (debugMode) {
-          document.getElementById('debugLat').textContent = 'Lat: ' + lat.toFixed(6);
-          document.getElementById('debugLng').textContent = 'Lng: ' + lng.toFixed(6);
-          document.getElementById('debugAcc').textContent = 'Accuracy: ' + accuracy.toFixed(1) + 'm';
-          document.getElementById('debugUpdates').textContent = 'Updates: ' + locationUpdateCount;
-        }
+        document.getElementById('debugLat').textContent = 'Lat: ' + lat.toFixed(6);
+        document.getElementById('debugLng').textContent = 'Lng: ' + lng.toFixed(6);
+        document.getElementById('debugAcc').textContent = 'Accuracy: ' + accuracy.toFixed(1) + 'm';
+        document.getElementById('debugUpdates').textContent = 'Updates: ' + locationUpdateCount;
       }
 
       // Step -1: Language Selection
@@ -838,7 +837,8 @@
       });
 
       // Load the config when the page opens, so it is ready when the user taps "Accept"
-      const configRequest = fetch('videos.json').then(response => response.json());
+      // no-cache: ask the server every time, so a newly pushed videos.json is used right away
+      const configRequest = fetch('videos.json', { cache: 'no-cache' }).then(response => response.json());
       configRequest.then(data => { configData = data; }).catch(() => {});
 
       // Step 2: Consent to Geolocation and Initialize Map
@@ -938,18 +938,12 @@
 
       // Step 4: Get the user's location with continuous 5-second updates
       function getUserLocation() {
+        let gpsErrorCount = 0; // Errors since the last position, shown in debug mode
+        let restartTimer = null;
+
         if (navigator.geolocation) {
-          // Use watchPosition for continuous location updates
-          watchId = navigator.geolocation.watchPosition(
-            success, 
-            error, 
-            {
-              enableHighAccuracy: true, // enable high accuracy
-              timeout: 10000, // wait for 10 seconds
-              maximumAge: 0 // don't use cached position
-            }
-          );
-          
+          startWatching();
+
           // Set up 5-second interval to request fresh location
           setInterval(() => {
             if (watchId !== null) {
@@ -960,12 +954,27 @@
         } else {
           alert('Geolocation is not supported by your browser.');
         }
-        
+
+        // Use watchPosition for continuous location updates
+        function startWatching() {
+          watchId = navigator.geolocation.watchPosition(
+            success,
+            error,
+            {
+              enableHighAccuracy: true, // enable high accuracy
+              timeout: 10000, // wait for 10 seconds
+              maximumAge: 0 // don't use cached position
+            }
+          );
+        }
+
         // callback function on success by geolocation.watchPosition
         function success(position) {
           const { latitude, longitude, accuracy } = position.coords;
           locationUpdateCount++;
           lastPosition = { latitude, longitude };
+          gpsErrorCount = 0;
+          document.getElementById('debugGps').textContent = 'GPS: ok';
           console.log('Location updated:', latitude, longitude, '(Update #' + locationUpdateCount + ')');
           
           // Update debug info
@@ -994,25 +1003,29 @@
 
         // callback function on error by geolocation.watchPosition
         function error(err) {
-          switch(err.code) {
-            case err.PERMISSION_DENIED:
-              alert("User denied the request for Geolocation.");
-              break;
-            case err.POSITION_UNAVAILABLE:
-              alert("Location information is unavailable.");
-              break;
-            case err.TIMEOUT:
-              alert("The request to get user location timed out.");
-              break;
-            default:
-              alert("An unknown error occurred.");
-              break;
-          }
-          // Stop the geolocation watch listener on error
           if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
-            watchId = null; // Clear the watchId after stopping it
+            watchId = null;
           }
+
+          // Without permission nothing can work: stop and tell the user
+          if (err.code === err.PERMISSION_DENIED) {
+            document.getElementById('debugGps').textContent = 'GPS: permission denied';
+            alert("User denied the request for Geolocation.");
+            return;
+          }
+
+          // Timeouts and lost signal are usually temporary (buildings, underpasses):
+          // keep the last position, fade the marker and try again without interrupting the visitor
+          gpsErrorCount++;
+          const reason = err.code === err.TIMEOUT ? 'timeout' : 'no signal';
+          console.log('Location error (' + reason + '), retrying:', err.message);
+          document.getElementById('debugGps').textContent = 'GPS: ' + reason + ', retrying (' + gpsErrorCount + ')';
+          if (userMarker) {
+            userMarker.setOpacity(0.4);
+          }
+          clearTimeout(restartTimer);
+          restartTimer = setTimeout(startWatching, 3000);
         }
       }
 
@@ -1104,13 +1117,17 @@
       const audioPlayers = []; // { element, gain, areaIndex, direction, stopTimer, error }
       const audioPositions = new Map(); // Area index -> playback position, to continue where it stopped
 
+      // Areas without a file are still drawn in debug mode, they just stay silent
       function isValidAudioArea(area) {
-        const valid = typeof area.latitude === 'number' && typeof area.longitude === 'number' &&
-          typeof area.radius === 'number' && typeof area.url === 'string' && area.url.trim() !== '';
+        const valid = typeof area.latitude === 'number' && typeof area.longitude === 'number' && typeof area.radius === 'number';
         if (!valid) {
           console.error('Invalid audio area:', area);
         }
         return valid;
+      }
+
+      function audioFile(area) {
+        return typeof area.url === 'string' ? area.url.trim() : '';
       }
 
       // Step 6b: Draw the audio areas; they are only added to the map in debug mode
@@ -1125,11 +1142,12 @@
             dashArray: '6 6',
             fillOpacity: 0.1,
             radius: area.radius
-          }).bindPopup(`<strong>${area.name || 'Audio area ' + (index + 1)}</strong><br>${area.url}`).addTo(audioAreaLayer);
+          }).bindPopup(`<strong>${area.name || 'Audio area ' + (index + 1)}</strong><br>${audioFile(area) || 'No audio file'}`).addTo(audioAreaLayer);
         });
         if (debugMode) {
           audioAreaLayer.addTo(map);
         }
+        updateDebugAudio();
       }
 
       // Must run during a tap: iOS only lets audio start later if the audio context and
@@ -1215,7 +1233,8 @@
         }
         const videoOpen = !videoPage.classList.contains('hidden'); // Audio stays silent while a video is open
         audioAreas.forEach((area, index) => {
-          const inside = !videoOpen && map.distance([latitude, longitude], [area.latitude, area.longitude]) <= area.radius;
+          const inside = !videoOpen && audioFile(area) !== '' &&
+            map.distance([latitude, longitude], [area.latitude, area.longitude]) <= area.radius;
           const player = audioPlayers.find(p => p.areaIndex === index);
           if (inside && !player) {
             startAudio(index);
@@ -1238,7 +1257,7 @@
         const { element } = player;
         player.areaIndex = index;
         player.error = null;
-        element.src = area.url.trim();
+        element.src = audioFile(area);
         element.loop = area.loop !== false;
         // Continue where the audio stopped when the visitor left the area
         const position = audioPositions.get(index);
@@ -1292,9 +1311,13 @@
       }
 
       function updateDebugAudio() {
+        if (!audioAreas.length) {
+          document.getElementById('debugAudio').textContent = 'Audio: no audio areas in videos.json';
+          return;
+        }
         const playing = audioPlayers.filter(player => player.areaIndex !== null).map(player => {
           const area = audioAreas[player.areaIndex];
-          const file = area.url.trim().split('/').pop();
+          const file = audioFile(area).split('/').pop();
           const state = player.error ? 'error: ' + player.error
             : player.direction === 'in' ? Math.round((area.volume ?? 1) * 100) + '%' : 'fading out';
           return `${area.name || 'Audio area ' + (player.areaIndex + 1)} – ${file} (${state})`;
