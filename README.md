@@ -243,34 +243,73 @@ Popular alternatives:
 - Bright: `https://tiles.openfreemap.org/styles/bright`
 - Or use any MapLibre GL style JSON
 
+### Editor
+
+`editor.html` edits everything in `videos.json` on a map, so you don't have to write JSON by hand. Open `https://YOUR-USERNAME.github.io/VideoWalker/editor.html` (or the file served by a local web server). It starts with the published `videos.json`.
+
+- **Chrome/Edge:** click **Open project folder…** and choose your local VideoWalker folder. The editor then edits the local `videos.json` and **Save to project folder** writes it back, together with new images and audio files.
+- **Other browsers:** click **Open videos.json…** to edit your local file, then **Download videos.json** (and any new files) and move them into the project folder.
+
+The tabs:
+
+- **General:** version, debug menu entry, start position, impressum per language
+- **Videos:** video locations with URL, position, radius, and title and description per language
+- **Audio:** audio areas and the fade time (see below)
+- **Overlay:** a drawn map on top of the base map (see below)
+
+Click a circle or an entry to edit it, and drag the markers to move things. Commit and push the changed files afterwards.
+
+### Audio Areas
+
+Audio areas play a sound while a visitor is inside them. The audio fades in when they enter, fades out when they leave, and fades out while a video is open. It continues where it stopped when they come back. Visitors don't see the areas or the player. **Toggle Debug Mode** shows the areas as blue dashed circles and the file that is playing.
+
+```json
+"audio": {
+  "fadeSeconds": 3,
+  "areas": [
+    {
+      "name": "Birds",
+      "url": "audio/birds.mp3",
+      "latitude": 47.3905,
+      "longitude": 8.5115,
+      "radius": 30,
+      "volume": 0.8,
+      "loop": true
+    }
+  ]
+}
+```
+
+- `fadeSeconds`: duration of every fade
+- `name`: shown in debug mode only
+- `url`: a file in the project (the editor copies chosen files into the `audio` folder) or a web URL. Web URLs must allow cross-origin access (CORS), otherwise the app can't fade them.
+- `radius`: in meters
+- `volume`: 0 to 1
+- `loop`: start again at the end (default `true`)
+
+Up to three areas can play at the same time, so overlapping areas crossfade. Test on an iPhone: iOS only allows the audio because it is unlocked when the visitor taps **Accept and Continue**.
+
 ### Custom Drawn Map Overlay
 
-You can lay your own drawn map over part of the base map. `overlay-tool.html` creates a template to draw on: a map image of exactly the area you choose.
+You can lay your own drawn map over part of the base map. The **Overlay** tab of the editor creates a template to draw on: a map image of exactly the area you choose.
 
-1. Open `https://YOUR-USERNAME.github.io/VideoWalker/overlay-tool.html` (or the file served by a local web server)
-2. Drag the two red corners, or paste the upper-left and lower-right corner as `lat, lng`
-3. Pick the image width and label size, then:
-   - **Chrome/Edge:** click **Save to project folder…** and choose your local VideoWalker folder. The tool writes `overlay.png` and adds the `overlay` entry to `videos.json`.
-   - **Other browsers:** click **Download PNG + videos.json** and move both files into the project folder.
-4. Draw on top of `overlay.png` in any drawing program and save it under the same name, keeping the proportions of the image
-5. Commit and push `overlay.png` and `videos.json`
-
-The tool adds this entry to `videos.json`:
+1. Drag the two orange corners, or paste the upper-left and lower-right corner as `lat, lng`
+2. Pick the image width and label size, and click **Create template**
+3. Save or download, then draw on top of the template in any drawing program, keeping the proportions of the image
+4. Choose your drawing with **Choose drawing…**, and save again
 
 ```json
 "overlay": {
-  "image": "overlay.png",
+  "image": "pirate_map.png",
   "topLeft": { "latitude": 47.3925, "longitude": 8.51 },
   "bottomRight": { "latitude": 47.3898, "longitude": 8.514 },
   "opacity": 1
 }
 ```
 
-- `image`: PNG file next to `videos.json`. Transparent parts show the base map.
-- `topLeft` / `bottomRight`: corners of the image on the map. They must match the template, so don't change them after drawing.
-- `opacity`: 0 (invisible) to 1 (opaque). The tool keeps your value when you create a new template.
-
-⚠️ Saving a template overwrites the image under that file name. The tool asks first, but give your drawing a copy or a different name before you create a new template.
+- `image`: image file next to `videos.json`. Transparent parts of a PNG show the base map.
+- `topLeft` / `bottomRight`: corners of the image on the map. Moving the corners in the editor moves and stretches the drawing, which the editor shows live.
+- `opacity`: 0 (invisible) to 1 (opaque)
 
 ### Changing Circle Colors
 
@@ -351,8 +390,9 @@ watchId = navigator.geolocation.watchPosition(
 VideoWalker/
 ├── index.html         # Main application file (HTML, CSS, JavaScript)
 ├── videos.json        # Configuration file for locations and videos
-├── overlay-tool.html  # Creates the template image for a drawn map overlay
-├── overlay.png        # Optional drawn map overlay (see "Custom Drawn Map Overlay")
+├── editor.html        # Editor for videos.json (see "Editor")
+├── audio/             # Optional audio files for the audio areas
+├── pirate_map.png     # Optional drawn map overlay (see "Custom Drawn Map Overlay")
 └── README.md          # This file
 ```
 

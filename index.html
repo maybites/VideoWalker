@@ -403,6 +403,7 @@
       <div id="debugAcc">Accuracy: --</div>
       <div id="debugUpdates">Updates: 0</div>
       <div id="debugNearest">Nearest: --</div>
+      <div id="debugAudio">Audio: --</div>
     </div>
     
     <div id="videoPage" class="hidden">
@@ -529,6 +530,9 @@
       let watchId = null; // Store the watch ID
       let locationUpdateCount = 0; // Counter for location updates
       let hasInitiallycentered = false; // Flag to track if map has been centered on first location
+      let lastPosition = null; // Last GPS fix, to bring the audio back after a video
+      let audioAreas = []; // Audio areas from the config
+      let audioAreaLayer = null; // Circles of the audio areas, only shown in debug mode
 
       const languagePage = document.getElementById('languagePage');
       const languageButtons = document.querySelectorAll('.languageButton');
@@ -621,6 +625,7 @@
         videoPage.classList.add('hidden');
         mapPage.classList.remove('hidden');
         menuButton.classList.add('show'); // Show menu button
+        resumeAudioAfterVideo();
 
         // Fix map display after screen rotation - force Leaflet to recalculate dimensions
         setTimeout(() => {
@@ -645,6 +650,7 @@
             videoPage.classList.add('hidden');
             mapPage.classList.remove('hidden');
             menuButton.classList.add('show');
+            resumeAudioAfterVideo();
             setTimeout(() => {
               if (map) {
                 map.invalidateSize();
@@ -728,6 +734,14 @@
           console.log('Debug mode enabled - iOS install prompt flag cleared');
         } else {
           debugInfo.classList.add('hidden');
+        }
+        // Audio areas are invisible to visitors and only drawn in debug mode
+        if (audioAreaLayer) {
+          if (debugMode) {
+            audioAreaLayer.addTo(map);
+          } else {
+            audioAreaLayer.remove();
+          }
         }
         // Update popup content to show/hide play buttons based on new debug mode state
         updatePopupContent();
@@ -823,17 +837,24 @@
         consentPage.classList.remove('hidden');
       });
 
+      // Load the config when the page opens, so it is ready when the user taps "Accept"
+      const configRequest = fetch('videos.json').then(response => response.json());
+      configRequest.then(data => { configData = data; }).catch(() => {});
+
       // Step 2: Consent to Geolocation and Initialize Map
       acceptButton.addEventListener('click', () => {
         consentPage.classList.add('hidden');
         mapPage.classList.remove('hidden');
         menuButton.classList.add('show'); // Show menu button on map page
-        // Fetch config first to get default position, then initialize map
-        fetch('videos.json')
-          .then(response => response.json())
+        // iOS only lets audio start later if it was unlocked during this tap
+        if (configData?.audio?.areas?.length) {
+          unlockAudio();
+        }
+        configRequest
           .then(data => {
             configData = data;
             videosData = data.locations || data;
+            audioAreas = (data.audio?.areas || []).filter(isValidAudioArea);
 
             // Set version from config if available
             if (configData.version) {
@@ -849,6 +870,10 @@
 
             initMap(); // Initialize the map with default position from config
             addVideoLocationsToMap(); // Add locations to map
+            addAudioAreasToMap(); // Debug-only circles of the audio areas
+            if (audioAreas.length) {
+              unlockAudio(); // Only does something if the config arrived after the tap; may not work on iOS then
+            }
             getUserLocation(); // Start tracking location after everything is set up
           })
           .catch(error => {
@@ -940,6 +965,7 @@
         function success(position) {
           const { latitude, longitude, accuracy } = position.coords;
           locationUpdateCount++;
+          lastPosition = { latitude, longitude };
           console.log('Location updated:', latitude, longitude, '(Update #' + locationUpdateCount + ')');
           
           // Update debug info
@@ -963,6 +989,7 @@
           }
           
           checkProximity(latitude, longitude);
+          updateAudio(latitude, longitude);
         }
 
         // callback function on error by geolocation.watchPosition
@@ -1067,6 +1094,240 @@
       /**                       **/
       /***************************/
 
+      /***************************/
+      /**                       **/
+      /**      AUDIO LAYER      **/
+      /**                       **/
+
+      const AUDIO_PLAYER_COUNT = 3; // How many audio areas can sound at the same time
+      let audioContext = null;
+      const audioPlayers = []; // { element, gain, areaIndex, direction, stopTimer, error }
+      const audioPositions = new Map(); // Area index -> playback position, to continue where it stopped
+
+      function isValidAudioArea(area) {
+        const valid = typeof area.latitude === 'number' && typeof area.longitude === 'number' &&
+          typeof area.radius === 'number' && typeof area.url === 'string' && area.url.trim() !== '';
+        if (!valid) {
+          console.error('Invalid audio area:', area);
+        }
+        return valid;
+      }
+
+      // Step 6b: Draw the audio areas; they are only added to the map in debug mode
+      function addAudioAreasToMap() {
+        map.createPane('audioAreas');
+        map.getPane('audioAreas').style.zIndex = 390; // Below the video circles, so those stay tappable
+        audioAreaLayer = L.layerGroup();
+        audioAreas.forEach((area, index) => {
+          L.circle([area.latitude, area.longitude], {
+            pane: 'audioAreas',
+            color: '#1565c0',
+            dashArray: '6 6',
+            fillOpacity: 0.1,
+            radius: area.radius
+          }).bindPopup(`<strong>${area.name || 'Audio area ' + (index + 1)}</strong><br>${area.url}`).addTo(audioAreaLayer);
+        });
+        if (debugMode) {
+          audioAreaLayer.addTo(map);
+        }
+      }
+
+      // Must run during a tap: iOS only lets audio start later if the audio context and
+      // the audio elements were started once by the user
+      function unlockAudio() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (audioContext || !AudioContextClass) {
+          return;
+        }
+        // Play even when the iPhone's silent switch is on, like the videos do
+        if (navigator.audioSession) {
+          navigator.audioSession.type = 'playback';
+        }
+        audioContext = new AudioContextClass();
+        audioContext.resume();
+        const silence = silentWavUrl();
+        for (let i = 0; i < AUDIO_PLAYER_COUNT; i++) {
+          const element = new Audio();
+          element.crossOrigin = 'anonymous'; // Web URLs need CORS to be faded through Web Audio
+          element.src = silence;
+          // Pause the silence only: an audio area may already have taken over this element
+          element.play().then(() => {
+            if (element.src === silence) {
+              element.pause();
+            }
+          }).catch(() => {});
+          // iOS ignores element.volume, so the fades run through a gain node
+          const gain = audioContext.createGain();
+          gain.gain.value = 0;
+          audioContext.createMediaElementSource(element).connect(gain).connect(audioContext.destination);
+          const player = { element, gain, areaIndex: null, direction: null, stopTimer: null, error: null };
+          element.addEventListener('error', () => {
+            if (player.areaIndex !== null) {
+              player.error = 'cannot load the file';
+              updateDebugAudio();
+            }
+          });
+          audioPlayers.push(player);
+        }
+      }
+
+      // iOS suspends the audio while the page is in the background
+      document.addEventListener('visibilitychange', () => {
+        if (audioContext && document.visibilityState === 'visible') {
+          audioContext.resume();
+        }
+      });
+
+      // If the browser blocked the audio, the next tap anywhere starts it
+      function retryBlockedAudio() {
+        if (!audioContext) {
+          return;
+        }
+        audioContext.resume();
+        audioPlayers.forEach(player => {
+          if (player.direction === 'in' && player.element.paused && !player.element.ended) {
+            playAudioElement(player);
+          }
+        });
+      }
+      document.addEventListener('touchend', retryBlockedAudio);
+      document.addEventListener('click', retryBlockedAudio);
+
+      function playAudioElement(player) {
+        player.element.play()
+          .then(() => {
+            player.error = null;
+            updateDebugAudio();
+          })
+          .catch(error => {
+            if (error.name === 'AbortError') {
+              return; // A newer load or pause replaced this request
+            }
+            player.error = error.name === 'NotAllowedError' ? 'blocked by the browser, tap the screen' : error.message;
+            updateDebugAudio();
+          });
+      }
+
+      // Step 8: Fade the audio areas in and out for the current position
+      function updateAudio(latitude, longitude) {
+        if (!audioContext) {
+          return;
+        }
+        const videoOpen = !videoPage.classList.contains('hidden'); // Audio stays silent while a video is open
+        audioAreas.forEach((area, index) => {
+          const inside = !videoOpen && map.distance([latitude, longitude], [area.latitude, area.longitude]) <= area.radius;
+          const player = audioPlayers.find(p => p.areaIndex === index);
+          if (inside && !player) {
+            startAudio(index);
+          } else if (inside && player.direction === 'out') {
+            fadeAudio(player, 'in'); // Back inside while it was still fading out
+          } else if (!inside && player && player.direction === 'in') {
+            fadeAudio(player, 'out');
+          }
+        });
+        updateDebugAudio();
+      }
+
+      function startAudio(index) {
+        const player = audioPlayers.find(p => p.areaIndex === null);
+        if (!player) {
+          console.log('All audio players are busy, skipping audio area', index);
+          return;
+        }
+        const area = audioAreas[index];
+        const { element } = player;
+        player.areaIndex = index;
+        player.error = null;
+        element.src = area.url.trim();
+        element.loop = area.loop !== false;
+        // Continue where the audio stopped when the visitor left the area
+        const position = audioPositions.get(index);
+        if (position) {
+          element.addEventListener('loadedmetadata', () => { element.currentTime = position; }, { once: true });
+        }
+        fadeAudio(player, 'in');
+      }
+
+      function fadeAudio(player, direction) {
+        const area = audioAreas[player.areaIndex];
+        const seconds = configData?.audio?.fadeSeconds ?? 3;
+        const gain = player.gain.gain;
+        const now = audioContext.currentTime;
+        gain.cancelScheduledValues(now);
+        gain.setValueAtTime(gain.value, now);
+        gain.linearRampToValueAtTime(direction === 'in' ? (area.volume ?? 1) : 0, now + seconds);
+        player.direction = direction;
+        clearTimeout(player.stopTimer);
+
+        if (direction === 'in') {
+          playAudioElement(player);
+        } else {
+          // Pause once it is silent and free the player for other areas
+          player.stopTimer = setTimeout(() => {
+            const { element } = player;
+            audioPositions.set(player.areaIndex, element.ended ? 0 : element.currentTime);
+            element.pause();
+            player.areaIndex = null;
+            player.direction = null;
+            updateDebugAudio();
+          }, seconds * 1000);
+        }
+      }
+
+      // A video starts: fade out everything that is playing
+      function fadeOutAllAudio() {
+        audioPlayers.forEach(player => {
+          if (player.areaIndex !== null && player.direction === 'in') {
+            fadeAudio(player, 'out');
+          }
+        });
+        updateDebugAudio();
+      }
+
+      // The video page closed: fade the audio of the current position back in
+      function resumeAudioAfterVideo() {
+        if (lastPosition) {
+          updateAudio(lastPosition.latitude, lastPosition.longitude);
+        }
+      }
+
+      function updateDebugAudio() {
+        const playing = audioPlayers.filter(player => player.areaIndex !== null).map(player => {
+          const area = audioAreas[player.areaIndex];
+          const file = area.url.trim().split('/').pop();
+          const state = player.error ? 'error: ' + player.error
+            : player.direction === 'in' ? Math.round((area.volume ?? 1) * 100) + '%' : 'fading out';
+          return `${area.name || 'Audio area ' + (player.areaIndex + 1)} – ${file} (${state})`;
+        });
+        document.getElementById('debugAudio').textContent = 'Audio: ' + (playing.length ? playing.join(', ') : '--');
+      }
+
+      // 0.1 s of silence as a WAV file, played once to unlock the audio elements
+      function silentWavUrl() {
+        const samples = 4410;
+        const view = new DataView(new ArrayBuffer(44 + samples * 2));
+        const writeText = (offset, text) => [...text].forEach((char, i) => view.setUint8(offset + i, char.charCodeAt(0)));
+        writeText(0, 'RIFF');
+        view.setUint32(4, 36 + samples * 2, true);
+        writeText(8, 'WAVE');
+        writeText(12, 'fmt ');
+        view.setUint32(16, 16, true);     // Format chunk size
+        view.setUint16(20, 1, true);      // PCM
+        view.setUint16(22, 1, true);      // Mono
+        view.setUint32(24, 44100, true);  // Sample rate
+        view.setUint32(28, 88200, true);  // Bytes per second
+        view.setUint16(32, 2, true);      // Bytes per sample
+        view.setUint16(34, 16, true);     // Bits per sample
+        writeText(36, 'data');
+        view.setUint32(40, samples * 2, true);
+        return URL.createObjectURL(new Blob([view.buffer], { type: 'audio/wav' }));
+      }
+
+      /**                       **/
+      /**      AUDIO LAYER      **/
+      /**                       **/
+      /***************************/
+
       // Step 7: Check proximity to a video location and show popup if in range
       function checkProximity(latitude, longitude) {
         let nearestDistance = Infinity;
@@ -1133,6 +1394,7 @@
 
       // Step 9: Play video (handles delayed video loading)
       function playVideo(videoUrl) {
+        fadeOutAllAudio();
         const videoType = detectVideoType(videoUrl);
         currentVideoType = videoType;
 

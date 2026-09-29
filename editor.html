@@ -1,0 +1,1719 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VideoWalk Editor</title>
+    <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        display: flex;
+        height: 100vh;
+        color: #333;
+      }
+
+      #panel {
+        width: 380px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid #ccc;
+        box-sizing: border-box;
+      }
+
+      #panelHeader {
+        padding: 16px 20px 0;
+      }
+
+      #panelHeader h1 {
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+
+      #sourceInfo {
+        font-size: 13px;
+        color: #555;
+        line-height: 1.4;
+      }
+
+      #sourceInfo .unsaved {
+        color: #c00;
+        font-weight: bold;
+      }
+
+      #tabs {
+        display: flex;
+        margin-top: 12px;
+        border-bottom: 1px solid #ccc;
+      }
+
+      #tabs button {
+        flex: 1;
+        padding: 10px 0;
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+        border-bottom: 3px solid transparent;
+        background: none;
+        color: #555;
+      }
+
+      #tabs button.active {
+        border-bottom-color: #333;
+        color: #333;
+        font-weight: bold;
+      }
+
+      .tab {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 20px 20px;
+      }
+
+      #panelFooter {
+        padding: 12px 20px 16px;
+        border-top: 1px solid #ccc;
+      }
+
+      h2 {
+        font-size: 15px;
+        margin: 20px 0 4px;
+      }
+
+      .hint {
+        font-size: 13px;
+        line-height: 1.4;
+        color: #666;
+        margin: 6px 0;
+      }
+
+      .hint.warning {
+        color: #c00;
+      }
+
+      .field {
+        display: block;
+        margin: 12px 0 0;
+        font-size: 13px;
+        font-weight: bold;
+      }
+
+      .field input:not([type="checkbox"]):not([type="range"]),
+      .field textarea,
+      .field select {
+        display: block;
+        width: 100%;
+        margin-top: 4px;
+        padding: 7px;
+        font-size: 14px;
+        font-family: inherit;
+        font-weight: normal;
+        box-sizing: border-box;
+      }
+
+      .field textarea {
+        min-height: 60px;
+        resize: vertical;
+      }
+
+      .field input.invalid {
+        border-color: #c00;
+        background-color: #fff4f4;
+      }
+
+      .field.checkbox {
+        font-weight: normal;
+      }
+
+      .field input[type="range"] {
+        display: block;
+        width: 100%;
+      }
+
+      /* Button styling matches the intro pages of index.html */
+      button.action,
+      label.action {
+        display: block;
+        width: 100%;
+        margin-top: 10px;
+        padding: 10px;
+        font-size: 15px;
+        text-align: center;
+        cursor: pointer;
+        border: 2px solid #333;
+        background-color: #fff;
+        color: #333;
+        border-radius: 5px;
+        box-sizing: border-box;
+      }
+
+      button.action:hover:not(:disabled),
+      label.action:hover {
+        background-color: #333;
+        color: #fff;
+      }
+
+      button.action:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      button.small {
+        padding: 6px;
+        font-size: 13px;
+        border-width: 1px;
+      }
+
+      button.danger {
+        border-color: #c00;
+        color: #c00;
+      }
+
+      button.danger:hover {
+        background-color: #c00 !important;
+        color: #fff !important;
+      }
+
+      .card {
+        margin-top: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+
+      .card.selected {
+        border-color: #333;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 10px;
+        font-size: 14px;
+        text-align: left;
+        cursor: pointer;
+        border: none;
+        background: none;
+        color: inherit;
+      }
+
+      .card.selected .card-header {
+        font-weight: bold;
+      }
+
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 10px;
+        flex-shrink: 0;
+      }
+
+      .card-body {
+        padding: 0 10px 12px;
+      }
+
+      .card-body audio {
+        width: 100%;
+        margin-top: 8px;
+      }
+
+      #status {
+        margin-top: 10px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      #status.error {
+        color: #c00;
+      }
+
+      #preview {
+        display: block;
+        max-width: 100%;
+        margin-top: 10px;
+        border: 1px solid #ccc;
+      }
+
+      #map {
+        flex: 1;
+      }
+
+      /* Off-screen map that renders the template at its exact pixel size */
+      #renderContainer {
+        position: absolute;
+        left: -100000px;
+        top: 0;
+      }
+
+      @media (max-width: 700px) {
+        body { flex-direction: column; }
+        #panel { width: 100%; height: 60vh; border-right: none; border-bottom: 1px solid #ccc; }
+      }
+
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <div id="panelHeader">
+        <h1>VideoWalk editor</h1>
+        <div id="sourceInfo">Loading videos.json…</div>
+        <button id="openFolder" class="action small">Open project folder…</button>
+        <label id="openFileLabel" class="action small">Open videos.json…<input id="openFile" type="file" accept=".json,application/json" hidden /></label>
+        <nav id="tabs">
+          <button data-tab="general">General</button>
+          <button data-tab="locations" class="active">Videos</button>
+          <button data-tab="audio">Audio</button>
+          <button data-tab="overlay">Overlay</button>
+        </nav>
+      </div>
+
+      <section id="tab-general" class="tab hidden"></section>
+
+      <section id="tab-locations" class="tab">
+        <p class="hint">Click a circle or an entry to edit it. Drag the markers on the map to move them.</p>
+        <div id="locationList"></div>
+        <button id="addLocation" class="action small">+ Add video location at map centre</button>
+      </section>
+
+      <section id="tab-audio" class="tab hidden">
+        <p class="hint">Audio fades in while a visitor is inside an area and fades out when they leave or a video starts. Visitors don't see the areas; debug mode shows them.</p>
+        <div id="audioSettings"></div>
+        <div id="audioList"></div>
+        <button id="addAudio" class="action small">+ Add audio area at map centre</button>
+      </section>
+
+      <section id="tab-overlay" class="tab hidden">
+        <div id="overlayCurrent"></div>
+
+        <h2>Area and template</h2>
+        <p class="hint">Drag the orange corners, or paste coordinates as <em>lat, lng</em>. The corners place the drawing on the map. A template is a map image of exactly this area, to draw your map on.</p>
+        <label class="field">Upper-left corner<input id="topLeft" placeholder="47.392500, 8.510000" /></label>
+        <label class="field">Lower-right corner<input id="bottomRight" placeholder="47.389800, 8.514000" /></label>
+        <label class="field">Image width (px)<input id="width" type="number" min="256" max="8192" step="1" value="2048" /></label>
+        <label class="field">Label and line size
+          <select id="pixelRatio">
+            <option value="1">1× (more map detail)</option>
+            <option value="2" selected>2×</option>
+            <option value="3">3× (larger labels)</option>
+          </select>
+        </label>
+        <label class="field">Map style
+          <select id="style">
+            <option value="positron">Positron (as in the app)</option>
+            <option value="bright">Bright</option>
+            <option value="liberty">Liberty</option>
+          </select>
+        </label>
+        <label class="field">Template file name<input id="templateName" value="overlay-template.png" /></label>
+        <div id="info" class="hint"></div>
+        <button id="createTemplate" class="action small">Create template</button>
+        <img id="preview" class="hidden" alt="Rendered template" />
+      </section>
+
+      <div id="panelFooter">
+        <button id="save" class="action">Save to project folder</button>
+        <button id="download" class="action">Download videos.json</button>
+        <div id="status"></div>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div id="renderContainer"></div>
+
+    <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+    <script>
+      const STYLE_BASE = 'https://tiles.openfreemap.org/styles/';
+      const WORLD_SIZE = 512;   // MapLibre's world size in CSS px at zoom 0
+      const MAX_PIXELS = 8192;  // Largest template edge we try to render
+      const MAX_ZOOM = 24;
+      const DEFAULT_LANGUAGES = ['en', 'de']; // The languages index.html has translations for
+      const DEFAULT_FADE_SECONDS = 3;
+      const COLORS = { locations: '#d00', audio: '#1565c0', area: '#e65100', start: '#333' };
+
+      const sourceInfo = document.getElementById('sourceInfo');
+      const openFolderButton = document.getElementById('openFolder');
+      const openFileLabel = document.getElementById('openFileLabel');
+      const openFileInput = document.getElementById('openFile');
+      const saveButton = document.getElementById('save');
+      const downloadButton = document.getElementById('download');
+      const status = document.getElementById('status');
+      const topLeftInput = document.getElementById('topLeft');
+      const bottomRightInput = document.getElementById('bottomRight');
+      const widthInput = document.getElementById('width');
+      const pixelRatioSelect = document.getElementById('pixelRatio');
+      const styleSelect = document.getElementById('style');
+      const templateNameInput = document.getElementById('templateName');
+      const info = document.getElementById('info');
+      const createTemplateButton = document.getElementById('createTemplate');
+      const preview = document.getElementById('preview');
+      const renderContainer = document.getElementById('renderContainer');
+
+      let config = { locations: [] }; // The videos.json being edited
+      let sourceName = '';            // Where config came from, for the header
+      let folder = null;              // Project folder handle (Chrome/Edge only)
+      let languages = [...DEFAULT_LANGUAGES];
+      let activeTab = 'locations';
+      const selected = { locations: -1, audio: -1 };
+      const pendingFiles = new Map(); // Project path -> Blob, written into the project on save
+      const fileUrls = new Map();     // Project path -> { blob, url } for previews
+      let templateArea = boundsAround({ lat: 51.505, lng: -0.09 }); // Same fallback position as index.html
+      let showOverlay = true;
+      let dirty = false;
+      let busy = false;
+      let mapReady = false;
+      let markers = [];               // Draggable markers of the active tab
+      let positionInputs = {};        // Position input of the open card per tab, kept in sync while dragging
+      let overlayRequest = 0;
+
+      // Writing straight into a folder only works in Chrome and Edge
+      const canWriteFolders = 'showDirectoryPicker' in window;
+      openFolderButton.classList.toggle('hidden', !canWriteFolders);
+      openFileLabel.classList.toggle('hidden', canWriteFolders);
+      updateButtons();
+
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: STYLE_BASE + 'positron',
+        center: [-0.09, 51.505],
+        zoom: 14
+      });
+      map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+      map.on('load', () => {
+        const empty = { type: 'FeatureCollection', features: [] };
+        map.addSource('audio', { type: 'geojson', data: empty });
+        map.addSource('locations', { type: 'geojson', data: empty });
+        map.addSource('template-area', { type: 'geojson', data: empty });
+        map.addLayer({ id: 'audio-fill', type: 'fill', source: 'audio', paint: { 'fill-color': COLORS.audio, 'fill-opacity': 0.12 } });
+        map.addLayer({
+          id: 'audio-line', type: 'line', source: 'audio',
+          paint: { 'line-color': COLORS.audio, 'line-width': ['case', ['get', 'selected'], 4, 2], 'line-dasharray': [2, 1.5] }
+        });
+        map.addLayer({ id: 'locations-fill', type: 'fill', source: 'locations', paint: { 'fill-color': COLORS.locations, 'fill-opacity': 0.15 } });
+        map.addLayer({
+          id: 'locations-line', type: 'line', source: 'locations',
+          paint: { 'line-color': COLORS.locations, 'line-width': ['case', ['get', 'selected'], 4, 2] }
+        });
+        map.addLayer({ id: 'area-line', type: 'line', source: 'template-area', paint: { 'line-color': COLORS.area, 'line-width': 2 } });
+        mapReady = true;
+        refreshCircles();
+        refreshTemplateArea();
+        refreshOverlayImage();
+        refreshAreaVisibility();
+      });
+
+      // Click a circle to edit it; the topmost circle wins
+      map.on('click', event => {
+        const [feature] = map.queryRenderedFeatures(event.point, { layers: ['locations-fill', 'audio-fill'] });
+        if (feature) {
+          const type = feature.layer.id === 'locations-fill' ? 'locations' : 'audio';
+          switchTab(type);
+          selectItem(type, feature.properties.index, false);
+        }
+      });
+      for (const layer of ['locations-fill', 'audio-fill']) {
+        map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
+      }
+
+      document.querySelectorAll('#tabs button').forEach(button => {
+        button.addEventListener('click', () => switchTab(button.dataset.tab));
+      });
+      document.getElementById('addLocation').addEventListener('click', () => addItem('locations'));
+      document.getElementById('addAudio').addEventListener('click', () => addItem('audio'));
+
+      window.addEventListener('beforeunload', event => {
+        if (dirty) {
+          event.preventDefault();
+        }
+      });
+
+      loadPublishedConfig();
+
+      /***************************/
+      /**                       **/
+      /**    LOAD AND SAVE      **/
+      /**                       **/
+
+      // Start from the videos.json next to this page (the published one on GitHub Pages)
+      function loadPublishedConfig() {
+        fetch('videos.json', { cache: 'no-store' })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to load videos.json');
+            }
+            return response.json();
+          })
+          .then(data => setConfig(data, 'the published videos.json'))
+          .catch(error => {
+            console.log('videos.json not loaded:', error);
+            setConfig({ locations: [] }, 'a new, empty videos.json');
+          });
+      }
+
+      openFolderButton.addEventListener('click', async () => {
+        if (dirty && !confirm('Discard the unsaved changes and open a project folder?')) {
+          return;
+        }
+        let picked;
+        try {
+          picked = await window.showDirectoryPicker({ id: 'videowalk', mode: 'readwrite' });
+        } catch (error) {
+          return; // Picker was cancelled
+        }
+        try {
+          const handle = await picked.getFileHandle('videos.json').catch(() => null);
+          if (!handle) {
+            throw new Error(`“${picked.name}” has no videos.json. Pick the VideoWalk project folder.`);
+          }
+          const data = JSON.parse(await (await handle.getFile()).text());
+          folder = picked;
+          setConfig(data, `videos.json in “${folder.name}”`);
+        } catch (error) {
+          showStatus(error.message, true);
+        }
+      });
+
+      // Browsers without folder access can still edit a local videos.json and download the result
+      openFileInput.addEventListener('change', async () => {
+        const file = openFileInput.files[0];
+        openFileInput.value = '';
+        if (!file || (dirty && !confirm('Discard the unsaved changes and open this file?'))) {
+          return;
+        }
+        try {
+          setConfig(JSON.parse(await file.text()), `${file.name} from your computer`);
+        } catch (error) {
+          showStatus('This file is not valid JSON: ' + error.message, true);
+        }
+      });
+
+      function setConfig(data, name) {
+        // Support the old format, a plain array of locations, like index.html does
+        config = Array.isArray(data) ? { locations: data } : data;
+        config.locations = config.locations || [];
+        sourceName = name;
+        languages = detectLanguages();
+        selected.locations = -1;
+        selected.audio = -1;
+        pendingFiles.clear();
+        fileUrls.forEach(entry => URL.revokeObjectURL(entry.url));
+        fileUrls.clear();
+        preview.classList.add('hidden');
+
+        if (hasOverlayCorners(config.overlay)) {
+          templateArea = boundsFromPoints(
+            { lat: config.overlay.topLeft.latitude, lng: config.overlay.topLeft.longitude },
+            { lat: config.overlay.bottomRight.latitude, lng: config.overlay.bottomRight.longitude }
+          );
+        } else if (config.defaultPosition) {
+          templateArea = boundsAround({ lat: config.defaultPosition.latitude, lng: config.defaultPosition.longitude });
+        }
+
+        setDirty(false);
+        if (folder) {
+          showStatus('');
+        } else {
+          showStatus(canWriteFolders ? 'Open the project folder to save your changes into it.' : 'Changes are saved by downloading videos.json.');
+        }
+        renderGeneral();
+        renderAudioSettings();
+        renderList('locations');
+        renderList('audio');
+        renderOverlayCurrent();
+        refreshCircles();
+        refreshMarkers();
+        refreshTemplateArea();
+        refreshOverlayImage();
+        fitToContent();
+      }
+
+      saveButton.addEventListener('click', async () => {
+        if (!confirmProblems()) {
+          return;
+        }
+        setBusy(true);
+        try {
+          const replaced = [];
+          for (const path of pendingFiles.keys()) {
+            if (await readProjectFile(path)) {
+              replaced.push(path);
+            }
+          }
+          if (replaced.length && !confirm(`These files already exist in “${folder.name}” and will be replaced:\n\n${replaced.join('\n')}\n\nContinue?`)) {
+            showStatus('Nothing was saved.');
+            return;
+          }
+          for (const [path, blob] of pendingFiles) {
+            await writeProjectFile(path, blob);
+          }
+          await writeProjectFile('videos.json', JSON.stringify(config, null, 2) + '\n');
+          const written = ['videos.json', ...pendingFiles.keys()];
+          pendingFiles.clear();
+          setDirty(false);
+          showStatus(`Saved ${written.join(', ')} in “${folder.name}”.`);
+          renderList('audio');
+          renderOverlayCurrent();
+        } catch (error) {
+          console.error(error);
+          showStatus(error.message, true);
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      // Fallback for browsers without folder access, or before a folder is opened
+      downloadButton.addEventListener('click', () => {
+        if (!confirmProblems()) {
+          return;
+        }
+        downloadBlob(new Blob([JSON.stringify(config, null, 2) + '\n'], { type: 'application/json' }), 'videos.json');
+        for (const [path, blob] of pendingFiles) {
+          downloadBlob(blob, baseName(path));
+        }
+        const audioFiles = [...pendingFiles.keys()].filter(path => path.includes('/'));
+        const otherFiles = [...pendingFiles.keys()].filter(path => !path.includes('/'));
+        let message = `Downloaded ${['videos.json', ...otherFiles].join(', ')}. Put ${otherFiles.length ? 'them' : 'it'} in the project folder, replacing the old videos.json.`;
+        if (audioFiles.length) {
+          message += ` Also downloaded ${audioFiles.map(baseName).join(', ')}: put ${audioFiles.length > 1 ? 'them' : 'it'} in the project's audio folder.`;
+        }
+        setDirty(false);
+        showStatus(message);
+      });
+
+      // Warn about entries the app can't use, before saving them
+      function confirmProblems() {
+        const problems = [];
+        config.locations.forEach((location, index) => {
+          const name = `Video location ${index + 1}`;
+          if (!isPlaced(location)) {
+            problems.push(`${name}: position or radius is missing`);
+          }
+          if (!detectVideoType(location.videoUrl || '')) {
+            problems.push(`${name}: the video URL is not a YouTube or Vimeo link`);
+          }
+          if (!languages.some(lang => localizedText(location.title, lang) || localizedText(location.description, lang))) {
+            problems.push(`${name}: without a title or description the app shows no popup and no play button`);
+          }
+        });
+        audioAreas().forEach((area, index) => {
+          const name = `Audio area ${index + 1}`;
+          if (!isPlaced(area)) {
+            problems.push(`${name}: position or radius is missing`);
+          }
+          if (!(area.url || '').trim()) {
+            problems.push(`${name}: no audio file`);
+          }
+        });
+        return !problems.length || confirm(`Some entries need attention:\n\n• ${problems.join('\n• ')}\n\nSave anyway?`);
+      }
+
+      async function readProjectFile(path) {
+        if (!folder) {
+          return null;
+        }
+        try {
+          const parts = path.split('/');
+          let directory = folder;
+          for (const part of parts.slice(0, -1)) {
+            directory = await directory.getDirectoryHandle(part);
+          }
+          return await (await directory.getFileHandle(parts.at(-1))).getFile();
+        } catch (error) {
+          return null;
+        }
+      }
+
+      async function writeProjectFile(path, data) {
+        const parts = path.split('/');
+        let directory = folder;
+        for (const part of parts.slice(0, -1)) {
+          directory = await directory.getDirectoryHandle(part, { create: true });
+        }
+        const writable = await (await directory.getFileHandle(parts.at(-1), { create: true })).createWritable();
+        await writable.write(data);
+        await writable.close();
+      }
+
+      // URL for previewing a project file: a new file, a file in the open folder, or the published file
+      async function resolveUrl(path) {
+        path = (path || '').trim();
+        if (!path) {
+          return null;
+        }
+        if (/^(https?:|data:|blob:)/i.test(path)) {
+          return path;
+        }
+        const blob = pendingFiles.get(path) || await readProjectFile(path);
+        if (!blob) {
+          return folder ? null : new URL(path, location.href).href;
+        }
+        const cached = fileUrls.get(path);
+        if (cached && cached.blob === blob) {
+          return cached.url;
+        }
+        if (cached) {
+          URL.revokeObjectURL(cached.url);
+        }
+        const url = URL.createObjectURL(blob);
+        fileUrls.set(path, { blob, url });
+        return url;
+      }
+
+      function downloadBlob(blob, name) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = name;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+      }
+
+      function setDirty(isDirty) {
+        dirty = isDirty;
+        sourceInfo.textContent = 'Editing ' + sourceName;
+        if (dirty) {
+          const unsaved = document.createElement('span');
+          unsaved.className = 'unsaved';
+          unsaved.textContent = ' · unsaved changes';
+          sourceInfo.append(unsaved);
+        }
+        updateButtons();
+      }
+
+      function markDirty() {
+        if (!dirty) {
+          setDirty(true);
+        }
+      }
+
+      function setBusy(isBusy) {
+        busy = isBusy;
+        updateButtons();
+      }
+
+      function updateButtons() {
+        saveButton.classList.toggle('hidden', !folder);
+        saveButton.disabled = busy;
+        downloadButton.disabled = busy;
+        createTemplateButton.disabled = busy || !!computeLayout().error;
+      }
+
+      function showStatus(message, isError = false) {
+        status.textContent = message;
+        status.classList.toggle('error', isError);
+      }
+
+      /**                       **/
+      /**    LOAD AND SAVE      **/
+      /**                       **/
+      /***************************/
+
+
+      /***************************/
+      /**                       **/
+      /**    PANELS             **/
+      /**                       **/
+
+      function switchTab(tab) {
+        activeTab = tab;
+        document.querySelectorAll('#tabs button').forEach(button => {
+          button.classList.toggle('active', button.dataset.tab === tab);
+        });
+        document.querySelectorAll('.tab').forEach(section => {
+          section.classList.toggle('hidden', section.id !== 'tab-' + tab);
+        });
+        refreshMarkers();
+        refreshAreaVisibility();
+      }
+
+      function renderGeneral() {
+        const tab = document.getElementById('tab-general');
+        tab.replaceChildren();
+
+        heading(tab, 'App');
+        textField(tab, 'Version (shown in the menu)', config.version, value => { config.version = value; });
+        checkboxField(tab, 'Show "Toggle Debug Mode" in the menu', config.showDebugToggle !== false, checked => {
+          config.showDebugToggle = checked;
+        });
+
+        heading(tab, 'Start position');
+        hint(tab, 'Where the map starts before the GPS position is known. Drag the dark marker or use the current map view.');
+        const start = config.defaultPosition || {};
+        positionInputs.general = positionField(tab, 'Centre (lat, lng)', start, () => {
+          config.defaultPosition = start;
+          refreshMarkers();
+        });
+        numberField(tab, 'Zoom (15–18 suits walking tours)', start.zoom, value => {
+          start.zoom = value;
+          config.defaultPosition = start;
+        }, { min: 1, max: 20, step: 1 });
+        actionButton(tab, 'Use current map view', () => {
+          const center = map.getCenter();
+          // Leaflet in index.html uses 256 px tiles, MapLibre 512 px: Leaflet zoom = MapLibre zoom + 1
+          config.defaultPosition = { latitude: round7(center.lat), longitude: round7(center.lng), zoom: Math.round(map.getZoom() + 1) };
+          markDirty();
+          renderGeneral();
+          refreshMarkers();
+        });
+
+        heading(tab, 'Impressum');
+        languages.forEach(lang => {
+          textField(tab, `Impressum (${lang}, HTML allowed)`, localizedText(config.impressum, lang), value => {
+            setLocalizedText(config, 'impressum', lang, value);
+          }, { multiline: true });
+        });
+      }
+
+      function renderAudioSettings() {
+        const settings = document.getElementById('audioSettings');
+        settings.replaceChildren();
+        numberField(settings, 'Fade time (seconds)', config.audio?.fadeSeconds ?? DEFAULT_FADE_SECONDS, value => {
+          ensureAudio().fadeSeconds = value;
+        }, { min: 0, max: 30, step: 0.5 });
+      }
+
+      function renderList(type) {
+        const list = document.getElementById(type === 'locations' ? 'locationList' : 'audioList');
+        list.replaceChildren();
+        positionInputs[type] = null;
+        const items = listItems(type);
+        if (!items.length) {
+          hint(list, type === 'locations' ? 'No video locations yet.' : 'No audio areas yet.');
+        }
+        items.forEach((item, index) => {
+          const card = document.createElement('div');
+          card.className = 'card' + (index === selected[type] ? ' selected' : '');
+          const header = document.createElement('button');
+          header.type = 'button';
+          header.className = 'card-header';
+          const dot = document.createElement('span');
+          dot.className = 'dot';
+          dot.style.backgroundColor = COLORS[type];
+          const title = document.createElement('span');
+          title.className = 'card-title';
+          title.textContent = itemLabel(type, item, index);
+          header.append(dot, title);
+          header.addEventListener('click', () => selectItem(type, index === selected[type] ? -1 : index, true));
+          card.append(header);
+
+          if (index === selected[type]) {
+            const body = document.createElement('div');
+            body.className = 'card-body';
+            if (type === 'locations') {
+              renderLocationBody(body, item, index);
+            } else {
+              renderAudioBody(body, item, index);
+            }
+            card.append(body);
+          }
+          list.append(card);
+        });
+      }
+
+      function renderLocationBody(body, location, index) {
+        const typeHint = document.createElement('div');
+        const showVideoType = () => {
+          const type = detectVideoType(location.videoUrl || '');
+          typeHint.className = 'hint' + (type ? '' : ' warning');
+          typeHint.textContent = type ? (type === 'youtube' ? 'YouTube video' : 'Vimeo video') : 'Paste a YouTube or Vimeo link.';
+        };
+        textField(body, 'Video URL', location.videoUrl, value => {
+          location.videoUrl = value;
+          showVideoType();
+        }, { placeholder: 'https://vimeo.com/123456789' });
+        body.append(typeHint);
+        showVideoType();
+
+        positionInputs.locations = positionField(body, 'Position (lat, lng)', location, () => afterMove('locations', index));
+        numberField(body, 'Radius (m)', location.radius, value => {
+          location.radius = value;
+          refreshCircles();
+        }, { min: 1, step: 1 });
+
+        languages.forEach(lang => {
+          textField(body, `Title (${lang})`, localizedText(location.title, lang), value => {
+            setLocalizedText(location, 'title', lang, value);
+            updateCardTitle('locations', index);
+          });
+          textField(body, `Description (${lang})`, localizedText(location.description, lang), value => {
+            setLocalizedText(location, 'description', lang, value);
+          }, { multiline: true });
+        });
+
+        deleteButton(body, 'Delete video location', 'locations', index);
+      }
+
+      function renderAudioBody(body, area, index) {
+        textField(body, 'Name (shown in debug mode)', area.name, value => {
+          area.name = value;
+          updateCardTitle('audio', index);
+        });
+
+        const urlInput = textField(body, 'Audio file (web URL or file in the project)', area.url, value => {
+          area.url = value;
+          updatePreview();
+        }, { placeholder: 'audio/birds.mp3 or https://…' });
+        fileButton(body, 'Choose audio file…', 'audio/*', file => {
+          const path = 'audio/' + safeFileName(file.name);
+          pendingFiles.set(path, file);
+          area.url = path;
+          urlInput.value = path;
+          updatePreview();
+          updateCardTitle('audio', index);
+        });
+        const fileHint = hint(body, '');
+        const player = document.createElement('audio');
+        player.controls = true;
+        player.preload = 'none';
+        body.append(player);
+
+        async function updatePreview() {
+          const url = (area.url || '').trim();
+          const resolved = await resolveUrl(url);
+          if (pendingFiles.has(url)) {
+            fileHint.className = 'hint';
+            fileHint.textContent = folder ? 'New file: it is copied into the project when you save.' : 'New file: download and put it in the project\'s audio folder.';
+          } else if (url && !resolved) {
+            fileHint.className = 'hint warning';
+            fileHint.textContent = `${url} is not in the project folder.`;
+          } else {
+            fileHint.className = 'hint';
+            fileHint.textContent = /^https?:/i.test(url) ? 'Web URLs must allow cross-origin access (CORS), otherwise the app cannot fade them.' : '';
+          }
+          if (resolved) {
+            player.src = resolved;
+          } else {
+            player.removeAttribute('src');
+          }
+        }
+        updatePreview();
+
+        positionInputs.audio = positionField(body, 'Position (lat, lng)', area, () => afterMove('audio', index));
+        numberField(body, 'Radius (m)', area.radius, value => {
+          area.radius = value;
+          refreshCircles();
+        }, { min: 1, step: 1 });
+        rangeField(body, 'Volume', area.volume ?? 1, value => { area.volume = value; });
+        checkboxField(body, 'Loop (start again at the end)', area.loop !== false, checked => { area.loop = checked; });
+
+        deleteButton(body, 'Delete audio area', 'audio', index);
+      }
+
+      // The current overlay: its image, opacity and visibility in the editor
+      function renderOverlayCurrent() {
+        const section = document.getElementById('overlayCurrent');
+        section.replaceChildren();
+        heading(section, 'Drawn map');
+        const overlay = config.overlay;
+
+        const chooseImage = file => {
+          const path = safeFileName(file.name);
+          pendingFiles.set(path, file);
+          if (overlay) {
+            overlay.image = path;
+          } else {
+            config.overlay = overlayEntry(templateArea, path);
+          }
+          renderOverlayCurrent();
+          refreshOverlayImage();
+        };
+
+        if (!overlay) {
+          hint(section, 'No drawn map yet. Choose its area below and create a template, or choose a drawing you already have.');
+          fileButton(section, 'Choose drawing…', 'image/png,image/webp,image/jpeg', chooseImage);
+          return;
+        }
+
+        const imageInput = textField(section, 'Image file (next to videos.json)', overlay.image, value => {
+          overlay.image = value;
+          refreshOverlayImage();
+          updateImageHint();
+        });
+        fileButton(section, 'Choose drawing…', 'image/png,image/webp,image/jpeg', chooseImage);
+        const imageHint = hint(section, '');
+        async function updateImageHint() {
+          const path = (overlay.image || '').trim();
+          if (pendingFiles.has(path)) {
+            imageHint.className = 'hint';
+            imageHint.textContent = folder ? 'New file: it is copied into the project when you save.' : 'New file: download and put it next to videos.json.';
+          } else if (folder && path && !(await readProjectFile(path))) {
+            imageHint.className = 'hint warning';
+            imageHint.textContent = `${path} is not in the project folder.`;
+          } else {
+            imageHint.textContent = '';
+          }
+        }
+        updateImageHint();
+        imageInput.addEventListener('change', updateImageHint);
+
+        rangeField(section, 'Opacity', overlay.opacity ?? 1, value => {
+          overlay.opacity = value;
+          if (map.getLayer('overlay-image')) {
+            map.setPaintProperty('overlay-image', 'raster-opacity', value);
+          }
+        });
+        checkboxField(section, 'Show the drawing in the editor', showOverlay, checked => {
+          showOverlay = checked;
+          refreshOverlayImage();
+        }, { saved: false });
+        const remove = actionButton(section, 'Remove drawn map', () => {
+          if (!confirm('Remove the drawn map from videos.json? The image file stays in the project folder.')) {
+            return;
+          }
+          delete config.overlay;
+          markDirty();
+          renderOverlayCurrent();
+          refreshOverlayImage();
+        });
+        remove.classList.add('danger');
+      }
+
+      function selectItem(type, index, panToItem) {
+        selected[type] = index;
+        renderList(type);
+        refreshCircles();
+        const item = listItems(type)[index];
+        if (item && panToItem && isPlaced(item)) {
+          map.easeTo({ center: [item.longitude, item.latitude] });
+        }
+        const card = document.querySelector(`#${type === 'locations' ? 'locationList' : 'audioList'} .card.selected`);
+        if (card) {
+          card.scrollIntoView({ block: 'nearest' });
+        }
+      }
+
+      function addItem(type) {
+        const center = map.getCenter();
+        const position = { latitude: round7(center.lat), longitude: round7(center.lng) };
+        if (type === 'locations') {
+          const number = config.locations.length + 1;
+          config.locations.push({
+            videoUrl: '',
+            ...position,
+            radius: 20,
+            title: Object.fromEntries(languages.map(lang => [lang, (lang === 'de' ? 'Standort ' : 'Location ') + number])),
+            description: {}
+          });
+        } else {
+          ensureAudio().areas.push({ name: 'Audio area ' + (audioAreas().length + 1), url: '', ...position, radius: 30, volume: 1, loop: true });
+        }
+        markDirty();
+        refreshMarkers();
+        selectItem(type, listItems(type).length - 1, false);
+      }
+
+      function updateCardTitle(type, index) {
+        const title = document.querySelector(`#${type === 'locations' ? 'locationList' : 'audioList'} .card.selected .card-title`);
+        if (title) {
+          title.textContent = itemLabel(type, listItems(type)[index], index);
+        }
+      }
+
+      function itemLabel(type, item, index) {
+        if (type === 'locations') {
+          return localizedText(item.title, 'en') || localizedText(item.title, languages[0]) || `Video location ${index + 1}`;
+        }
+        return item.name || baseName(item.url || '') || `Audio area ${index + 1}`;
+      }
+
+      /**                       **/
+      /**    PANELS             **/
+      /**                       **/
+      /***************************/
+
+
+      /***************************/
+      /**                       **/
+      /**    FORM FIELDS        **/
+      /**                       **/
+
+      function heading(parent, text) {
+        const element = document.createElement('h2');
+        element.textContent = text;
+        parent.append(element);
+        return element;
+      }
+
+      function hint(parent, text) {
+        const element = document.createElement('p');
+        element.className = 'hint';
+        element.textContent = text;
+        parent.append(element);
+        return element;
+      }
+
+      function textField(parent, label, value, onInput, { multiline = false, placeholder = '' } = {}) {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'field';
+        wrapper.append(label);
+        const input = document.createElement(multiline ? 'textarea' : 'input');
+        input.value = value ?? '';
+        input.placeholder = placeholder;
+        input.addEventListener('input', () => {
+          onInput(input.value);
+          markDirty();
+        });
+        wrapper.append(input);
+        parent.append(wrapper);
+        return input;
+      }
+
+      function numberField(parent, label, value, onInput, { min, max, step } = {}) {
+        const input = textField(parent, label, value, () => {}, {});
+        input.type = 'number';
+        Object.assign(input, { min: min ?? '', max: max ?? '', step: step ?? 'any' });
+        input.addEventListener('input', () => {
+          const number = Number(input.value);
+          const valid = input.value !== '' && Number.isFinite(number) && (min === undefined || number >= min);
+          input.classList.toggle('invalid', !valid);
+          if (valid) {
+            onInput(number);
+          }
+        });
+        return input;
+      }
+
+      // "lat, lng" in one field, the format Google Maps copies; item gets latitude and longitude
+      function positionField(parent, label, item, onMove) {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'field';
+        wrapper.append(label);
+        const input = document.createElement('input');
+        input.placeholder = '47.3911, 8.5118';
+        input.value = isNumber(item.latitude) && isNumber(item.longitude) ? formatLatLng(item.latitude, item.longitude) : '';
+        input.addEventListener('change', () => {
+          const position = parseLatLng(input.value);
+          input.classList.toggle('invalid', !position);
+          if (!position) {
+            return;
+          }
+          item.latitude = position.lat;
+          item.longitude = position.lng;
+          input.value = formatLatLng(position.lat, position.lng);
+          markDirty();
+          onMove();
+        });
+        wrapper.append(input);
+        parent.append(wrapper);
+        return input;
+      }
+
+      function rangeField(parent, label, value, onInput) {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'field';
+        const text = document.createElement('span');
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = 0;
+        input.max = 1;
+        input.step = 0.05;
+        input.value = value;
+        const showValue = () => { text.textContent = `${label}: ${Math.round(input.value * 100)}%`; };
+        input.addEventListener('input', () => {
+          onInput(Number(input.value));
+          showValue();
+          markDirty();
+        });
+        showValue();
+        wrapper.append(text, input);
+        parent.append(wrapper);
+        return input;
+      }
+
+      function checkboxField(parent, label, checked, onChange, { saved = true } = {}) {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'field checkbox';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = checked;
+        input.addEventListener('change', () => {
+          onChange(input.checked);
+          if (saved) {
+            markDirty();
+          }
+        });
+        wrapper.append(input, ' ' + label);
+        parent.append(wrapper);
+        return input;
+      }
+
+      function actionButton(parent, text, onClick) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'action small';
+        button.textContent = text;
+        button.addEventListener('click', onClick);
+        parent.append(button);
+        return button;
+      }
+
+      function fileButton(parent, text, accept, onFile) {
+        const label = document.createElement('label');
+        label.className = 'action small';
+        label.textContent = text;
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = accept;
+        input.hidden = true;
+        input.addEventListener('change', () => {
+          const file = input.files[0];
+          input.value = '';
+          if (file) {
+            onFile(file);
+            markDirty();
+          }
+        });
+        label.append(input);
+        parent.append(label);
+        return label;
+      }
+
+      function deleteButton(parent, text, type, index) {
+        const button = actionButton(parent, text, () => {
+          if (!confirm(`${text} “${itemLabel(type, listItems(type)[index], index)}”?`)) {
+            return;
+          }
+          listItems(type).splice(index, 1);
+          selected[type] = -1;
+          markDirty();
+          renderList(type);
+          refreshCircles();
+          refreshMarkers();
+        });
+        button.classList.add('danger');
+        return button;
+      }
+
+      /**                       **/
+      /**    FORM FIELDS        **/
+      /**                       **/
+      /***************************/
+
+
+      /***************************/
+      /**                       **/
+      /**    MAP                **/
+      /**                       **/
+
+      function refreshCircles() {
+        if (!mapReady) {
+          return;
+        }
+        map.getSource('locations').setData(circlesGeoJSON(config.locations, selected.locations));
+        map.getSource('audio').setData(circlesGeoJSON(audioAreas(), selected.audio));
+      }
+
+      // Draggable markers for the entries of the active tab
+      function refreshMarkers() {
+        markers.forEach(marker => marker.remove());
+        markers = [];
+
+        if (activeTab === 'locations' || activeTab === 'audio') {
+          const type = activeTab;
+          markers = listItems(type).map((item, index) => {
+            if (!isPlaced(item)) {
+              return null;
+            }
+            const marker = new maplibregl.Marker({ draggable: true, color: COLORS[type], scale: 0.8 })
+              .setLngLat([item.longitude, item.latitude])
+              .addTo(map);
+            marker.on('dragstart', () => {
+              if (selected[type] !== index) {
+                selectItem(type, index, false);
+              }
+            });
+            marker.on('drag', () => {
+              const position = marker.getLngLat();
+              item.latitude = round7(position.lat);
+              item.longitude = round7(position.lng);
+              refreshCircles();
+              if (positionInputs[type]) {
+                positionInputs[type].value = formatLatLng(item.latitude, item.longitude);
+              }
+              markDirty();
+            });
+            return marker;
+          });
+        } else if (activeTab === 'general') {
+          const start = config.defaultPosition;
+          if (start && isNumber(start.latitude) && isNumber(start.longitude)) {
+            const marker = new maplibregl.Marker({ draggable: true, color: COLORS.start })
+              .setLngLat([start.longitude, start.latitude])
+              .addTo(map);
+            marker.on('drag', () => {
+              const position = marker.getLngLat();
+              start.latitude = round7(position.lat);
+              start.longitude = round7(position.lng);
+              if (positionInputs.general) {
+                positionInputs.general.value = formatLatLng(start.latitude, start.longitude);
+              }
+              markDirty();
+            });
+            markers = [marker];
+          }
+        } else if (activeTab === 'overlay') {
+          // markers[0] is the upper-left corner, markers[1] the lower-right corner
+          markers = [
+            new maplibregl.Marker({ draggable: true, color: COLORS.area }).setLngLat([templateArea.west, templateArea.north]).addTo(map),
+            new maplibregl.Marker({ draggable: true, color: COLORS.area }).setLngLat([templateArea.east, templateArea.south]).addTo(map)
+          ];
+          markers.forEach(marker => {
+            marker.on('drag', () => {
+              setTemplateArea(boundsFromPoints(markers[0].getLngLat(), markers[1].getLngLat()), false);
+            });
+            // Snap the markers back onto the upper-left and lower-right corners
+            marker.on('dragend', () => setTemplateArea(templateArea, true));
+          });
+        }
+      }
+
+      function afterMove(type, index) {
+        const item = listItems(type)[index];
+        refreshCircles();
+        if (markers[index]) {
+          markers[index].setLngLat([item.longitude, item.latitude]);
+        } else {
+          refreshMarkers();
+        }
+        map.easeTo({ center: [item.longitude, item.latitude] });
+      }
+
+      // The template rectangle only matters on the overlay tab
+      function refreshAreaVisibility() {
+        if (mapReady) {
+          map.setLayoutProperty('area-line', 'visibility', activeTab === 'overlay' ? 'visible' : 'none');
+        }
+      }
+
+      // Show the drawn map in the editor, from a new file, the project folder or the published site
+      async function refreshOverlayImage() {
+        if (!mapReady) {
+          return;
+        }
+        const request = ++overlayRequest;
+        const overlay = config.overlay;
+        const url = overlay && showOverlay && hasOverlayCorners(overlay) ? await resolveUrl(overlay.image) : null;
+        if (request !== overlayRequest) {
+          return; // A newer refresh has started meanwhile
+        }
+        if (map.getLayer('overlay-image')) {
+          map.removeLayer('overlay-image');
+        }
+        if (map.getSource('overlay-image')) {
+          map.removeSource('overlay-image');
+        }
+        if (!url) {
+          return;
+        }
+        map.addSource('overlay-image', { type: 'image', url, coordinates: overlayCoordinates(overlay) });
+        map.addLayer({
+          id: 'overlay-image',
+          type: 'raster',
+          source: 'overlay-image',
+          paint: { 'raster-opacity': overlay.opacity ?? 1, 'raster-fade-duration': 0 }
+        }, 'audio-fill');
+      }
+
+      function fitToContent() {
+        const points = [...config.locations, ...audioAreas()]
+          .filter(isPlaced)
+          .map(item => [item.longitude, item.latitude]);
+        if (hasOverlayCorners(config.overlay)) {
+          points.push([templateArea.west, templateArea.north], [templateArea.east, templateArea.south]);
+        }
+        if (points.length) {
+          const bounds = points.reduce((b, point) => b.extend(point), new maplibregl.LngLatBounds(points[0], points[0]));
+          map.fitBounds(bounds, { padding: 80, maxZoom: 17, duration: 0 });
+        } else if (config.defaultPosition) {
+          map.jumpTo({ center: [config.defaultPosition.longitude, config.defaultPosition.latitude], zoom: (config.defaultPosition.zoom || 15) - 1 });
+        }
+      }
+
+      function circlesGeoJSON(items, selectedIndex) {
+        return {
+          type: 'FeatureCollection',
+          features: items.flatMap((item, index) => isPlaced(item) ? [{
+            type: 'Feature',
+            properties: { index, selected: index === selectedIndex },
+            geometry: { type: 'Polygon', coordinates: [circleRing(item.longitude, item.latitude, item.radius)] }
+          }] : [])
+        };
+      }
+
+      // Polygon approximating a circle of radius metres, fine for the small radii used here
+      function circleRing(lng, lat, radius) {
+        const ring = [];
+        for (let i = 0; i <= 64; i++) {
+          const angle = (i / 64) * 2 * Math.PI;
+          ring.push([
+            lng + (radius * Math.cos(angle)) / (111320 * Math.cos(lat * Math.PI / 180)),
+            lat + (radius * Math.sin(angle)) / 110540
+          ]);
+        }
+        return ring;
+      }
+
+      /**                       **/
+      /**    MAP                **/
+      /**                       **/
+      /***************************/
+
+
+      /***************************/
+      /**                       **/
+      /**    OVERLAY TEMPLATE   **/
+      /**                       **/
+
+      topLeftInput.addEventListener('change', applyCornerInputs);
+      bottomRightInput.addEventListener('change', applyCornerInputs);
+      widthInput.addEventListener('input', refreshTemplateArea);
+      pixelRatioSelect.addEventListener('change', refreshTemplateArea);
+
+      function applyCornerInputs() {
+        const topLeft = parseLatLng(topLeftInput.value);
+        const bottomRight = parseLatLng(bottomRightInput.value);
+        if (!topLeft || !bottomRight) {
+          info.className = 'hint warning';
+          info.textContent = 'Enter both corners as "lat, lng", for example 47.3925, 8.51';
+          return;
+        }
+        setTemplateArea(boundsFromPoints(topLeft, bottomRight), true);
+        map.fitBounds([[templateArea.west, templateArea.south], [templateArea.east, templateArea.north]], { padding: 60, duration: 0 });
+      }
+
+      // Changing the area also moves an existing drawing, which the editor shows live
+      function setTemplateArea(bounds, moveMarkers) {
+        templateArea = bounds;
+        const overlay = config.overlay;
+        if (overlay) {
+          Object.assign(overlay, overlayEntry(bounds, overlay.image, overlay));
+          markDirty();
+          const source = map.getSource('overlay-image');
+          if (source) {
+            source.setCoordinates(overlayCoordinates(overlay));
+          }
+        }
+        if (moveMarkers && activeTab === 'overlay' && markers.length === 2) {
+          markers[0].setLngLat([bounds.west, bounds.north]);
+          markers[1].setLngLat([bounds.east, bounds.south]);
+        }
+        refreshTemplateArea();
+      }
+
+      function refreshTemplateArea() {
+        const b = templateArea;
+        if (mapReady) {
+          map.getSource('template-area').setData({
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[[b.west, b.north], [b.east, b.north], [b.east, b.south], [b.west, b.south], [b.west, b.north]]]
+            }
+          });
+        }
+        topLeftInput.value = formatLatLng(b.north, b.west);
+        bottomRightInput.value = formatLatLng(b.south, b.east);
+
+        const layout = computeLayout();
+        if (layout.error) {
+          info.className = 'hint warning';
+          info.textContent = layout.error;
+        } else {
+          const nw = new maplibregl.LngLat(b.west, b.north);
+          const widthMeters = nw.distanceTo(new maplibregl.LngLat(b.east, b.north));
+          const heightMeters = nw.distanceTo(new maplibregl.LngLat(b.west, b.south));
+          info.className = 'hint';
+          info.textContent = `Area ≈ ${Math.round(widthMeters)} × ${Math.round(heightMeters)} m · ` +
+            `template ${layout.pixelWidth} × ${layout.pixelHeight} px · zoom ${layout.zoom.toFixed(1)}`;
+        }
+        updateButtons();
+      }
+
+      // Work out the canvas size and camera that put the map edges exactly on the chosen corners
+      function computeLayout() {
+        const width = Number(widthInput.value);
+        const pixelRatio = Number(pixelRatioSelect.value);
+        const b = templateArea;
+        if (!Number.isInteger(width) || width < 256 || width > MAX_PIXELS) {
+          return { error: `Image width must be a whole number between 256 and ${MAX_PIXELS}.` };
+        }
+        if (b.north - b.south < 1e-6 || b.east - b.west < 1e-6) {
+          return { error: 'The two corners must span an area.' };
+        }
+
+        const nw = maplibregl.MercatorCoordinate.fromLngLat([b.west, b.north]);
+        const se = maplibregl.MercatorCoordinate.fromLngLat([b.east, b.south]);
+        const cssWidth = Math.round(width / pixelRatio);
+        const pxPerUnit = cssWidth / (se.x - nw.x);
+        const cssHeight = Math.round((se.y - nw.y) * pxPerUnit);
+        // Rounding the height to whole pixels moves the south edge by less than a pixel;
+        // the exact rendered edges are read back from the map after rendering
+        const southY = nw.y + cssHeight / pxPerUnit;
+        const center = new maplibregl.MercatorCoordinate((nw.x + se.x) / 2, (nw.y + southY) / 2).toLngLat();
+        const layout = {
+          cssWidth,
+          cssHeight,
+          pixelRatio,
+          pixelWidth: cssWidth * pixelRatio,
+          pixelHeight: cssHeight * pixelRatio,
+          zoom: Math.log2(pxPerUnit / WORLD_SIZE),
+          center
+        };
+
+        if (layout.pixelHeight > MAX_PIXELS) {
+          return { error: `The template would be ${layout.pixelHeight} px high (max ${MAX_PIXELS}). Lower the width.` };
+        }
+        if (layout.zoom > MAX_ZOOM) {
+          return { error: 'The area is too small for this image size. Lower the width or pick larger labels.' };
+        }
+        return layout;
+      }
+
+      createTemplateButton.addEventListener('click', async () => {
+        const layout = computeLayout();
+        const name = safeFileName(templateNameInput.value.trim());
+        if (layout.error || !/\.png$/i.test(name)) {
+          showStatus('The template file name must end in .png.', true);
+          return;
+        }
+        templateNameInput.value = name;
+        setBusy(true);
+        showStatus('Rendering template…');
+        try {
+          const { blob, bounds } = await renderTemplate(layout);
+          pendingFiles.set(name, blob);
+          if (config.overlay) {
+            setTemplateArea(bounds, true);
+          } else {
+            templateArea = bounds;
+            config.overlay = overlayEntry(bounds, name);
+            refreshTemplateArea();
+          }
+          markDirty();
+          preview.src = URL.createObjectURL(blob);
+          preview.classList.remove('hidden');
+          renderOverlayCurrent();
+          refreshOverlayImage();
+          const next = config.overlay.image === name ? '' : ` Draw on it, then choose the drawing as image file above.`;
+          showStatus(`Template ${name} created (${layout.pixelWidth} × ${layout.pixelHeight} px). ` +
+            (folder ? 'Save to write it into the project.' : 'Download to get it.') + next);
+        } catch (error) {
+          console.error(error);
+          showStatus(error.message, true);
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      function renderTemplate(layout) {
+        return new Promise((resolve, reject) => {
+          renderContainer.style.width = layout.cssWidth + 'px';
+          renderContainer.style.height = layout.cssHeight + 'px';
+          const renderMap = new maplibregl.Map({
+            container: renderContainer,
+            style: STYLE_BASE + styleSelect.value,
+            center: layout.center,
+            zoom: layout.zoom,
+            maxZoom: MAX_ZOOM,
+            pixelRatio: layout.pixelRatio,
+            maxCanvasSize: [MAX_PIXELS, MAX_PIXELS],
+            interactive: false,
+            attributionControl: false,
+            fadeDuration: 0,
+            canvasContextAttributes: { preserveDrawingBuffer: true } // Keeps the frame readable for toBlob
+          });
+
+          const timeout = setTimeout(() => {
+            renderMap.remove();
+            reject(new Error('Rendering timed out. Check the internet connection and try again.'));
+          }, 60000);
+
+          // 'idle' fires once the style and all tiles are loaded and drawn
+          renderMap.once('idle', () => {
+            clearTimeout(timeout);
+            const canvas = renderMap.getCanvas();
+            if (canvas.width !== layout.pixelWidth || canvas.height !== layout.pixelHeight) {
+              renderMap.remove();
+              reject(new Error(`The browser could only render ${canvas.width} × ${canvas.height} px. Lower the width.`));
+              return;
+            }
+            const rendered = renderMap.getBounds();
+            canvas.toBlob(blob => {
+              renderMap.remove();
+              resolve({
+                blob,
+                bounds: {
+                  north: rendered.getNorth(),
+                  south: rendered.getSouth(),
+                  west: rendered.getWest(),
+                  east: rendered.getEast()
+                }
+              });
+            }, 'image/png');
+          });
+        });
+      }
+
+      function overlayEntry(bounds, image, previous) {
+        return {
+          image,
+          topLeft: { latitude: round7(bounds.north), longitude: round7(bounds.west) },
+          bottomRight: { latitude: round7(bounds.south), longitude: round7(bounds.east) },
+          opacity: previous?.opacity ?? 1
+        };
+      }
+
+      function overlayCoordinates(overlay) {
+        const { topLeft, bottomRight } = overlay;
+        // Corners as [lng, lat]: top-left, top-right, bottom-right, bottom-left
+        return [
+          [topLeft.longitude, topLeft.latitude],
+          [bottomRight.longitude, topLeft.latitude],
+          [bottomRight.longitude, bottomRight.latitude],
+          [topLeft.longitude, bottomRight.latitude]
+        ];
+      }
+
+      function hasOverlayCorners(overlay) {
+        return !!(overlay && overlay.topLeft && overlay.bottomRight);
+      }
+
+      /**                       **/
+      /**    OVERLAY TEMPLATE   **/
+      /**                       **/
+      /***************************/
+
+
+      /***************************/
+      /**                       **/
+      /**    HELPERS            **/
+      /**                       **/
+
+      function listItems(type) {
+        return type === 'locations' ? config.locations : audioAreas();
+      }
+
+      function audioAreas() {
+        return config.audio?.areas || [];
+      }
+
+      // Create the audio section only when it's needed, so untouched files stay unchanged
+      function ensureAudio() {
+        config.audio = config.audio || { fadeSeconds: DEFAULT_FADE_SECONDS, areas: [] };
+        config.audio.areas = config.audio.areas || [];
+        return config.audio;
+      }
+
+      function detectLanguages() {
+        const found = new Set(DEFAULT_LANGUAGES);
+        const add = value => {
+          if (value && typeof value === 'object') {
+            Object.keys(value).forEach(lang => found.add(lang));
+          }
+        };
+        config.locations.forEach(location => {
+          add(location.title);
+          add(location.description);
+        });
+        add(config.impressum);
+        return [...found];
+      }
+
+      // Texts are objects per language; a plain string counts as English, like in index.html
+      function localizedText(value, lang) {
+        if (value && typeof value === 'object') {
+          return value[lang] ?? '';
+        }
+        return lang === 'en' ? (value ?? '') : '';
+      }
+
+      function setLocalizedText(item, key, lang, text) {
+        if (!item[key] || typeof item[key] !== 'object') {
+          item[key] = item[key] ? { en: item[key] } : {};
+        }
+        if (text) {
+          item[key][lang] = text;
+        } else {
+          delete item[key][lang];
+        }
+      }
+
+      // Same rules as detectVideoType in index.html
+      function detectVideoType(url) {
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+          return 'youtube';
+        } else if (url.includes('vimeo.com')) {
+          return 'vimeo';
+        }
+        return null;
+      }
+
+      function isPlaced(item) {
+        return isNumber(item.latitude) && isNumber(item.longitude) && isNumber(item.radius) && item.radius > 0;
+      }
+
+      function isNumber(value) {
+        return typeof value === 'number' && Number.isFinite(value);
+      }
+
+      function round7(value) {
+        return Math.round(value * 1e7) / 1e7; // About 1 cm
+      }
+
+      function parseLatLng(text) {
+        const parts = text.split(/[\s,;]+/).filter(Boolean).map(Number);
+        if (parts.length !== 2 || parts.some(Number.isNaN)) {
+          return null;
+        }
+        const [lat, lng] = parts;
+        if (Math.abs(lat) > 85 || Math.abs(lng) > 180) {
+          return null;
+        }
+        return { lat, lng };
+      }
+
+      function formatLatLng(lat, lng) {
+        return lat.toFixed(6) + ', ' + lng.toFixed(6);
+      }
+
+      function baseName(path) {
+        return path.trim().split(/[/?#]/).filter(Boolean).pop() || '';
+      }
+
+      // File names that work in URLs on every system
+      function safeFileName(name) {
+        return name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-');
+      }
+
+      // The two points are opposite corners, in any order
+      function boundsFromPoints(p, q) {
+        return {
+          north: Math.max(p.lat, q.lat),
+          south: Math.min(p.lat, q.lat),
+          west: Math.min(p.lng, q.lng),
+          east: Math.max(p.lng, q.lng)
+        };
+      }
+
+      // A starting rectangle of roughly 400 × 300 m around a point
+      function boundsAround(center) {
+        const halfLat = 150 / 111320;
+        const halfLng = 200 / (111320 * Math.cos(center.lat * Math.PI / 180));
+        return {
+          north: center.lat + halfLat,
+          south: center.lat - halfLat,
+          west: center.lng - halfLng,
+          east: center.lng + halfLng
+        };
+      }
+
+      /**                       **/
+      /**    HELPERS            **/
+      /**                       **/
+      /***************************/
+    </script>
+  </body>
+</html>
