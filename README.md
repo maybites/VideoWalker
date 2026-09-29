@@ -243,6 +243,35 @@ Popular alternatives:
 - Bright: `https://tiles.openfreemap.org/styles/bright`
 - Or use any MapLibre GL style JSON
 
+### Custom Drawn Map Overlay
+
+You can lay your own drawn map over part of the base map. `overlay-tool.html` creates a template to draw on: a map image of exactly the area you choose.
+
+1. Open `https://YOUR-USERNAME.github.io/VideoWalker/overlay-tool.html` (or the file served by a local web server)
+2. Drag the two red corners, or paste the upper-left and lower-right corner as `lat, lng`
+3. Pick the image width and label size, then:
+   - **Chrome/Edge:** click **Save to project folder…** and choose your local VideoWalker folder. The tool writes `overlay.png` and adds the `overlay` entry to `videos.json`.
+   - **Other browsers:** click **Download PNG + videos.json** and move both files into the project folder.
+4. Draw on top of `overlay.png` in any drawing program and save it under the same name, keeping the proportions of the image
+5. Commit and push `overlay.png` and `videos.json`
+
+The tool adds this entry to `videos.json`:
+
+```json
+"overlay": {
+  "image": "overlay.png",
+  "topLeft": { "latitude": 47.3925, "longitude": 8.51 },
+  "bottomRight": { "latitude": 47.3898, "longitude": 8.514 },
+  "opacity": 1
+}
+```
+
+- `image`: PNG file next to `videos.json`. Transparent parts show the base map.
+- `topLeft` / `bottomRight`: corners of the image on the map. They must match the template, so don't change them after drawing.
+- `opacity`: 0 (invisible) to 1 (opaque). The tool keeps your value when you create a new template.
+
+⚠️ Saving a template overwrites the image under that file name. The tool asks first, but give your drawing a copy or a different name before you create a new template.
+
 ### Changing Circle Colors
 
 Find the circle creation code in `index.html` (around line 490):
@@ -320,9 +349,11 @@ watchId = navigator.geolocation.watchPosition(
 ### File Structure
 ```
 VideoWalker/
-├── index.html       # Main application file (HTML, CSS, JavaScript)
-├── videos.json      # Configuration file for locations and videos
-└── README.md        # This file
+├── index.html         # Main application file (HTML, CSS, JavaScript)
+├── videos.json        # Configuration file for locations and videos
+├── overlay-tool.html  # Creates the template image for a drawn map overlay
+├── overlay.png        # Optional drawn map overlay (see "Custom Drawn Map Overlay")
+└── README.md          # This file
 ```
 
 ---

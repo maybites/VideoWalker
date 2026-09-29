@@ -867,9 +867,43 @@
         
         map = L.map('map').setView([defaultLat, defaultLng], defaultZoom);
 
-        L.maplibreGL({
+        const glLayer = L.maplibreGL({
           style: 'https://tiles.openfreemap.org/styles/positron'
         }).addTo(map);
+
+        addDrawnMapOverlay(glLayer.getMaplibreMap());
+      }
+
+      // Show the custom drawn map from the config on top of the base map (see overlay-tool.html)
+      function addDrawnMapOverlay(glMap) {
+        const overlay = configData?.overlay;
+        if (!overlay || !overlay.image || !overlay.topLeft || !overlay.bottomRight) {
+          return;
+        }
+        const { topLeft, bottomRight } = overlay;
+
+        glMap.on('load', () => {
+          glMap.addSource('drawnMap', {
+            type: 'image',
+            url: overlay.image,
+            // Corners as [lng, lat]: top-left, top-right, bottom-right, bottom-left
+            coordinates: [
+              [topLeft.longitude, topLeft.latitude],
+              [bottomRight.longitude, topLeft.latitude],
+              [bottomRight.longitude, bottomRight.latitude],
+              [topLeft.longitude, bottomRight.latitude]
+            ]
+          });
+          glMap.addLayer({
+            id: 'drawnMap',
+            type: 'raster',
+            source: 'drawnMap',
+            paint: {
+              'raster-opacity': overlay.opacity ?? 1,
+              'raster-fade-duration': 0
+            }
+          });
+        });
       }
 
       /***************************/

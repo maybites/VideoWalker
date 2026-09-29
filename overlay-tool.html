@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VideoWalk Overlay Template</title>
+    <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        display: flex;
+        height: 100vh;
+      }
+
+      #panel {
+        width: 340px;
+        flex-shrink: 0;
+        padding: 20px;
+        box-sizing: border-box;
+        overflow-y: auto;
+        border-right: 1px solid #ccc;
+      }
+
+      #panel h1 {
+        font-size: 20px;
+        margin: 0 0 10px;
+      }
+
+      #panel p {
+        font-size: 14px;
+        line-height: 1.5;
+        color: #555;
+      }
+
+      #panel label {
+        display: block;
+        margin: 14px 0 4px;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+      #panel input,
+      #panel select {
+        width: 100%;
+        padding: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+
+      /* Button styling matches the intro pages of index.html */
+      #panel button {
+        width: 100%;
+        margin-top: 12px;
+        padding: 12px;
+        font-size: 16px;
+        cursor: pointer;
+        border: 2px solid #333;
+        background-color: #fff;
+        color: #333;
+        border-radius: 5px;
+      }
+
+      #panel button:hover:not(:disabled) {
+        background-color: #333;
+        color: #fff;
+      }
+
+      #panel button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      #info {
+        margin-top: 14px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      #info.error,
+      #status.error {
+        color: #c00;
+      }
+
+      #status {
+        margin-top: 14px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      #status pre {
+        background-color: #f4f4f4;
+        padding: 8px;
+        overflow-x: auto;
+        font-size: 12px;
+      }
+
+      #preview {
+        display: block;
+        max-width: 100%;
+        margin-top: 10px;
+        border: 1px solid #ccc;
+      }
+
+      #map {
+        flex: 1;
+      }
+
+      /* Off-screen map that renders the template at its exact pixel size */
+      #renderContainer {
+        position: absolute;
+        left: -100000px;
+        top: 0;
+      }
+
+      @media (max-width: 700px) {
+        body { flex-direction: column; }
+        #panel { width: 100%; max-height: 50vh; border-right: none; border-bottom: 1px solid #ccc; }
+      }
+
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <h1>Overlay template</h1>
+      <p>Drag the two red corners on the map, or paste coordinates as <em>lat, lng</em> (the format Google Maps copies). The template is a map image of exactly this area, to draw your own map on.</p>
+
+      <label for="topLeft">Upper-left corner</label>
+      <input id="topLeft" placeholder="47.392500, 8.510000" />
+      <label for="bottomRight">Lower-right corner</label>
+      <input id="bottomRight" placeholder="47.389800, 8.514000" />
+
+      <label for="width">Image width (px)</label>
+      <input id="width" type="number" min="256" max="8192" step="1" value="2048" />
+      <label for="pixelRatio">Label and line size</label>
+      <select id="pixelRatio">
+        <option value="1">1× (more map detail)</option>
+        <option value="2" selected>2×</option>
+        <option value="3">3× (larger labels)</option>
+      </select>
+      <label for="style">Map style</label>
+      <select id="style">
+        <option value="positron">Positron (as in the app)</option>
+        <option value="bright">Bright</option>
+        <option value="liberty">Liberty</option>
+      </select>
+      <label for="imageName">File name</label>
+      <input id="imageName" value="overlay.png" />
+
+      <div id="info"></div>
+
+      <button id="saveToFolder">Save to project folder…</button>
+      <button id="download">Download PNG + videos.json</button>
+
+      <div id="status"></div>
+      <img id="preview" class="hidden" alt="Rendered template" />
+    </div>
+    <div id="map"></div>
+    <div id="renderContainer"></div>
+
+    <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+    <script>
+      const STYLE_BASE = 'https://tiles.openfreemap.org/styles/';
+      const WORLD_SIZE = 512;   // MapLibre's world size in CSS px at zoom 0
+      const MAX_PIXELS = 8192;  // Largest template edge we try to render
+      const MAX_ZOOM = 24;
+
+      const topLeftInput = document.getElementById('topLeft');
+      const bottomRightInput = document.getElementById('bottomRight');
+      const widthInput = document.getElementById('width');
+      const pixelRatioSelect = document.getElementById('pixelRatio');
+      const styleSelect = document.getElementById('style');
+      const imageNameInput = document.getElementById('imageName');
+      const info = document.getElementById('info');
+      const saveButton = document.getElementById('saveToFolder');
+      const downloadButton = document.getElementById('download');
+      const status = document.getElementById('status');
+      const preview = document.getElementById('preview');
+      const renderContainer = document.getElementById('renderContainer');
+
+      let configData = null; // videos.json next to this page, if it could be fetched
+      let bounds = boundsAround({ lat: 51.505, lng: -0.09 }); // Same fallback position as index.html
+      let busy = false;
+
+      // Writing straight into a folder only works in Chrome and Edge
+      if (!window.showDirectoryPicker) {
+        saveButton.classList.add('hidden');
+      }
+
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: STYLE_BASE + styleSelect.value,
+        center: [(bounds.west + bounds.east) / 2, (bounds.north + bounds.south) / 2],
+        zoom: 15
+      });
+      map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+      // markers[0] is the upper-left corner, markers[1] the lower-right corner
+      const markers = [
+        new maplibregl.Marker({ draggable: true, color: '#c00' }),
+        new maplibregl.Marker({ draggable: true, color: '#c00' })
+      ];
+      markers.forEach(marker => {
+        marker.on('drag', () => {
+          bounds = boundsFromPoints(markers[0].getLngLat(), markers[1].getLngLat());
+          updateArea(false);
+        });
+        // Snap the markers back onto the upper-left and lower-right corners
+        marker.on('dragend', () => updateArea(true));
+      });
+
+      map.on('style.load', () => {
+        map.addSource('area', { type: 'geojson', data: areaGeoJSON(bounds) });
+        map.addLayer({ id: 'area-fill', type: 'fill', source: 'area', paint: { 'fill-color': '#c00', 'fill-opacity': 0.08 } });
+        map.addLayer({ id: 'area-line', type: 'line', source: 'area', paint: { 'line-color': '#c00', 'line-width': 2 } });
+      });
+
+      topLeftInput.addEventListener('change', applyInputs);
+      bottomRightInput.addEventListener('change', applyInputs);
+      widthInput.addEventListener('input', () => updateArea(false));
+      pixelRatioSelect.addEventListener('change', () => updateArea(false));
+      styleSelect.addEventListener('change', () => {
+        map.setStyle(STYLE_BASE + styleSelect.value, { diff: false });
+      });
+
+      updateArea(true);
+      loadConfig();
+
+      // Start from the overlay or default position in videos.json, if the page is served next to it
+      function loadConfig() {
+        fetch('videos.json', { cache: 'no-store' })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to load videos.json');
+            }
+            return response.json();
+          })
+          .then(data => {
+            configData = data;
+            const overlay = data.overlay;
+            if (overlay && overlay.topLeft && overlay.bottomRight) {
+              bounds = boundsFromPoints(
+                { lat: overlay.topLeft.latitude, lng: overlay.topLeft.longitude },
+                { lat: overlay.bottomRight.latitude, lng: overlay.bottomRight.longitude }
+              );
+              imageNameInput.value = overlay.image || imageNameInput.value;
+            } else if (data.defaultPosition) {
+              bounds = boundsAround({ lat: data.defaultPosition.latitude, lng: data.defaultPosition.longitude });
+            }
+            updateArea(true);
+            fitToArea();
+          })
+          .catch(error => {
+            console.log('videos.json not loaded:', error);
+            status.textContent = 'videos.json could not be loaded (the page is probably opened as a file). Downloads will only include the PNG.';
+          });
+      }
+
+      function applyInputs() {
+        const topLeft = parseLatLng(topLeftInput.value);
+        const bottomRight = parseLatLng(bottomRightInput.value);
+        if (!topLeft || !bottomRight) {
+          showInfoError('Enter both corners as "lat, lng", for example 47.3925, 8.51');
+          return;
+        }
+        bounds = boundsFromPoints(topLeft, bottomRight);
+        updateArea(true);
+        fitToArea();
+      }
+
+      // Redraw the rectangle and the size info; moveMarkers also rewrites the inputs
+      function updateArea(moveMarkers) {
+        const source = map.getSource('area');
+        if (source) {
+          source.setData(areaGeoJSON(bounds));
+        }
+        if (moveMarkers) {
+          markers[0].setLngLat([bounds.west, bounds.north]).addTo(map);
+          markers[1].setLngLat([bounds.east, bounds.south]).addTo(map);
+        }
+        topLeftInput.value = formatLatLng(bounds.north, bounds.west);
+        bottomRightInput.value = formatLatLng(bounds.south, bounds.east);
+
+        const layout = computeLayout();
+        if (layout.error) {
+          showInfoError(layout.error);
+          return;
+        }
+        const nw = new maplibregl.LngLat(bounds.west, bounds.north);
+        const widthMeters = nw.distanceTo(new maplibregl.LngLat(bounds.east, bounds.north));
+        const heightMeters = nw.distanceTo(new maplibregl.LngLat(bounds.west, bounds.south));
+        info.classList.remove('error');
+        info.innerHTML = `Area ≈ ${Math.round(widthMeters)} × ${Math.round(heightMeters)} m<br>` +
+          `Image ${layout.pixelWidth} × ${layout.pixelHeight} px · zoom ${layout.zoom.toFixed(1)}`;
+        setButtonsEnabled(!busy);
+      }
+
+      function fitToArea() {
+        map.fitBounds([[bounds.west, bounds.south], [bounds.east, bounds.north]], { padding: 60, duration: 0 });
+      }
+
+      // Work out the canvas size and camera that put the map edges exactly on the chosen corners
+      function computeLayout() {
+        const width = Number(widthInput.value);
+        const pixelRatio = Number(pixelRatioSelect.value);
+        if (!Number.isInteger(width) || width < 256 || width > MAX_PIXELS) {
+          return { error: `Image width must be a whole number between 256 and ${MAX_PIXELS}.` };
+        }
+        if (bounds.north - bounds.south < 1e-6 || bounds.east - bounds.west < 1e-6) {
+          return { error: 'The two corners must span an area.' };
+        }
+
+        const nw = maplibregl.MercatorCoordinate.fromLngLat([bounds.west, bounds.north]);
+        const se = maplibregl.MercatorCoordinate.fromLngLat([bounds.east, bounds.south]);
+        const cssWidth = Math.round(width / pixelRatio);
+        const pxPerUnit = cssWidth / (se.x - nw.x);
+        const cssHeight = Math.round((se.y - nw.y) * pxPerUnit);
+        // Rounding the height to whole pixels moves the south edge by less than a pixel;
+        // the exact rendered edges are read back from the map after rendering
+        const southY = nw.y + cssHeight / pxPerUnit;
+        const center = new maplibregl.MercatorCoordinate((nw.x + se.x) / 2, (nw.y + southY) / 2).toLngLat();
+        const layout = {
+          cssWidth,
+          cssHeight,
+          pixelRatio,
+          pixelWidth: cssWidth * pixelRatio,
+          pixelHeight: cssHeight * pixelRatio,
+          zoom: Math.log2(pxPerUnit / WORLD_SIZE),
+          center
+        };
+
+        if (layout.pixelHeight > MAX_PIXELS) {
+          return { error: `The image would be ${layout.pixelHeight} px high (max ${MAX_PIXELS}). Lower the width.` };
+        }
+        if (layout.zoom > MAX_ZOOM) {
+          return { error: 'The area is too small for this image size. Lower the width or pick larger labels.' };
+        }
+        return layout;
+      }
+
+      function renderTemplate(layout) {
+        return new Promise((resolve, reject) => {
+          renderContainer.style.width = layout.cssWidth + 'px';
+          renderContainer.style.height = layout.cssHeight + 'px';
+          const renderMap = new maplibregl.Map({
+            container: renderContainer,
+            style: STYLE_BASE + styleSelect.value,
+            center: layout.center,
+            zoom: layout.zoom,
+            maxZoom: MAX_ZOOM,
+            pixelRatio: layout.pixelRatio,
+            maxCanvasSize: [MAX_PIXELS, MAX_PIXELS],
+            interactive: false,
+            attributionControl: false,
+            fadeDuration: 0,
+            canvasContextAttributes: { preserveDrawingBuffer: true } // Keeps the frame readable for toBlob
+          });
+
+          const timeout = setTimeout(() => {
+            renderMap.remove();
+            reject(new Error('Rendering timed out. Check the internet connection and try again.'));
+          }, 60000);
+
+          // 'idle' fires once the style and all tiles are loaded and drawn
+          renderMap.once('idle', () => {
+            clearTimeout(timeout);
+            const canvas = renderMap.getCanvas();
+            if (canvas.width !== layout.pixelWidth || canvas.height !== layout.pixelHeight) {
+              renderMap.remove();
+              reject(new Error(`The browser could only render ${canvas.width} × ${canvas.height} px. Lower the width.`));
+              return;
+            }
+            const rendered = renderMap.getBounds();
+            canvas.toBlob(blob => {
+              renderMap.remove();
+              resolve({
+                blob,
+                bounds: {
+                  north: rendered.getNorth(),
+                  south: rendered.getSouth(),
+                  west: rendered.getWest(),
+                  east: rendered.getEast()
+                }
+              });
+            }, 'image/png');
+          });
+        });
+      }
+
+      // Save the PNG and update videos.json directly in the project folder (Chrome/Edge)
+      saveButton.addEventListener('click', async () => {
+        const layout = computeLayout();
+        const image = checkedImageName();
+        if (layout.error || !image) {
+          return;
+        }
+
+        let folder;
+        try {
+          folder = await window.showDirectoryPicker({ id: 'videowalk', mode: 'readwrite' });
+        } catch (error) {
+          return; // Picker was cancelled
+        }
+
+        setBusy(true, 'Reading videos.json…');
+        try {
+          const configHandle = await folder.getFileHandle('videos.json').catch(() => null);
+          if (!configHandle) {
+            throw new Error(`“${folder.name}” has no videos.json. Pick the VideoWalk project folder.`);
+          }
+          const config = JSON.parse(await (await configHandle.getFile()).text());
+
+          const existingImage = await folder.getFileHandle(image).catch(() => null);
+          if (existingImage && !confirm(`${image} already exists in “${folder.name}”. Overwrite it?\n\nIf you have drawn on it, the drawing will be lost.`)) {
+            setBusy(false, 'Nothing was saved.');
+            return;
+          }
+
+          setBusy(true, 'Rendering template…');
+          const { blob, bounds: rendered } = await renderTemplate(layout);
+          config.overlay = overlayEntry(rendered, image, config.overlay);
+          await writeFile(folder, image, blob);
+          await writeFile(folder, 'videos.json', JSON.stringify(config, null, 2) + '\n');
+          configData = config;
+          showResult(blob, config.overlay, `Saved ${image} and updated videos.json in “${folder.name}”.`);
+        } catch (error) {
+          showStatusError(error);
+        }
+      });
+
+      // Fallback for browsers without folder access: download both files
+      downloadButton.addEventListener('click', async () => {
+        const layout = computeLayout();
+        const image = checkedImageName();
+        if (layout.error || !image) {
+          return;
+        }
+
+        setBusy(true, 'Rendering template…');
+        try {
+          const { blob, bounds: rendered } = await renderTemplate(layout);
+          const overlay = overlayEntry(rendered, image, configData?.overlay);
+          downloadBlob(blob, image);
+          if (configData) {
+            const config = { ...configData, overlay };
+            downloadBlob(new Blob([JSON.stringify(config, null, 2) + '\n'], { type: 'application/json' }), 'videos.json');
+            showResult(blob, overlay, `Downloaded ${image} and videos.json. Move both into the project folder, replacing the old videos.json.`);
+          } else {
+            showResult(blob, overlay, `Downloaded ${image}. Add this entry to videos.json yourself:`);
+          }
+        } catch (error) {
+          showStatusError(error);
+        }
+      });
+
+      function overlayEntry(rendered, image, previous) {
+        const round = value => Math.round(value * 1e7) / 1e7; // About 1 cm
+        return {
+          image,
+          topLeft: { latitude: round(rendered.north), longitude: round(rendered.west) },
+          bottomRight: { latitude: round(rendered.south), longitude: round(rendered.east) },
+          opacity: previous?.opacity ?? 1
+        };
+      }
+
+      async function writeFile(folder, name, data) {
+        const handle = await folder.getFileHandle(name, { create: true });
+        const writable = await handle.createWritable();
+        await writable.write(data);
+        await writable.close();
+      }
+
+      function downloadBlob(blob, name) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = name;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+      }
+
+      function showResult(blob, overlay, message) {
+        preview.src = URL.createObjectURL(blob);
+        preview.classList.remove('hidden');
+        const pre = document.createElement('pre');
+        pre.textContent = '"overlay": ' + JSON.stringify(overlay, null, 2);
+        status.classList.remove('error');
+        status.textContent = message;
+        status.appendChild(pre);
+        setBusy(false);
+      }
+
+      function showStatusError(error) {
+        console.error(error);
+        setBusy(false);
+        status.classList.add('error');
+        status.textContent = error.message;
+      }
+
+      function showInfoError(message) {
+        info.classList.add('error');
+        info.textContent = message;
+        setButtonsEnabled(false);
+      }
+
+      function setBusy(isBusy, message) {
+        busy = isBusy;
+        if (message !== undefined) {
+          status.classList.remove('error');
+          status.textContent = message;
+        }
+        setButtonsEnabled(!isBusy && !computeLayout().error);
+      }
+
+      function setButtonsEnabled(enabled) {
+        saveButton.disabled = !enabled;
+        downloadButton.disabled = !enabled;
+      }
+
+      function checkedImageName() {
+        const name = imageNameInput.value.trim();
+        if (!/^[\w.-]+\.png$/i.test(name)) {
+          showStatusError(new Error('The file name must end in .png and use only letters, digits, "-", "_" or ".".'));
+          return null;
+        }
+        return name;
+      }
+
+      function parseLatLng(text) {
+        const parts = text.split(/[\s,;]+/).filter(Boolean).map(Number);
+        if (parts.length !== 2 || parts.some(Number.isNaN)) {
+          return null;
+        }
+        const [lat, lng] = parts;
+        if (Math.abs(lat) > 85 || Math.abs(lng) > 180) {
+          return null;
+        }
+        return { lat, lng };
+      }
+
+      function formatLatLng(lat, lng) {
+        return lat.toFixed(6) + ', ' + lng.toFixed(6);
+      }
+
+      // The two points are opposite corners, in any order
+      function boundsFromPoints(p, q) {
+        return {
+          north: Math.max(p.lat, q.lat),
+          south: Math.min(p.lat, q.lat),
+          west: Math.min(p.lng, q.lng),
+          east: Math.max(p.lng, q.lng)
+        };
+      }
+
+      // A starting rectangle of roughly 400 × 300 m around a point
+      function boundsAround(center) {
+        const halfLat = 150 / 111320;
+        const halfLng = 200 / (111320 * Math.cos(center.lat * Math.PI / 180));
+        return {
+          north: center.lat + halfLat,
+          south: center.lat - halfLat,
+          west: center.lng - halfLng,
+          east: center.lng + halfLng
+        };
+      }
+
+      function areaGeoJSON(b) {
+        return {
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[b.west, b.north], [b.east, b.north], [b.east, b.south], [b.west, b.south], [b.west, b.north]]]
+          }
+        };
+      }
+    </script>
+  </body>
+</html>
