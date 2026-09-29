@@ -6,16 +6,16 @@
     "de": "<p><strong>VideoWalker</strong></p><p>Ein interaktives standortbasiertes Video-Erlebnis.</p><p>Weitere Informationen finden Sie auf unserer Website.</p>"
   },
   "defaultPosition": {
-    "latitude": 47.3911,
-    "longitude": 8.5118,
-    "zoom": 15
+    "latitude": 47.3796683,
+    "longitude": 8.5300801,
+    "zoom": 17
   },
   "locations": [
     {
       "videoUrl": " https://vimeo.com/1163654659",
-      "latitude": 47.3908481,
-      "longitude": 8.5111662,
-      "radius": 20,
+      "latitude": 47.3901643,
+      "longitude": 8.5109079,
+      "radius": 23,
       "title": {
         "en": "Location 1",
         "de": "Standort 1"
@@ -79,5 +79,19 @@
       "longitude": 8.5341774
     },
     "opacity": 1
+  },
+  "audio": {
+    "fadeSeconds": 3,
+    "areas": [
+      {
+        "name": "Audio area 1",
+        "url": "",
+        "latitude": 47.3907338,
+        "longitude": 8.5128206,
+        "radius": 30,
+        "volume": 1,
+        "loop": true
+      }
+    ]
   }
 }
