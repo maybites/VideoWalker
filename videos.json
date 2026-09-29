@@ -25,47 +25,59 @@
         "de": "Erster Video-Standort - 20m Radius"
       }
     },
-  {
-    "videoUrl": "https://vimeo.com/1163654986",
-    "latitude": 47.3920324,
-    "longitude": 8.5118911,
-    "radius": 20,
-    "title": {
-      "en": "Location 2",
-      "de": "Standort 2"
+    {
+      "videoUrl": "https://vimeo.com/1163654986",
+      "latitude": 47.3920324,
+      "longitude": 8.5118911,
+      "radius": 20,
+      "title": {
+        "en": "Location 2",
+        "de": "Standort 2"
+      },
+      "description": {
+        "en": "Second video location - 20m radius",
+        "de": "Zweiter Video-Standort - 20m Radius"
+      }
     },
-    "description": {
-      "en": "Second video location - 20m radius",
-      "de": "Zweiter Video-Standort - 20m Radius"
-    }
-  },
-  {
-    "videoUrl": "https://vimeo.com/1163655114",
-    "latitude": 47.391649,
-    "longitude": 8.513339,
-    "radius": 10,
-    "title": {
-      "en": "Location 3",
-      "de": "Standort 3"
+    {
+      "videoUrl": "https://vimeo.com/1163655114",
+      "latitude": 47.391649,
+      "longitude": 8.513339,
+      "radius": 10,
+      "title": {
+        "en": "Location 3",
+        "de": "Standort 3"
+      },
+      "description": {
+        "en": "Third video location - 10m radius",
+        "de": "Dritter Video-Standort - 10m Radius"
+      }
     },
-    "description": {
-      "en": "Third video location - 10m radius",
-      "de": "Dritter Video-Standort - 10m Radius"
+    {
+      "videoUrl": "https://vimeo.com/1163655235",
+      "latitude": 47.390331,
+      "longitude": 8.512387,
+      "radius": 20,
+      "title": {
+        "en": "Location 4",
+        "de": "Standort 4"
+      },
+      "description": {
+        "en": "Fourth video location - 20m radius",
+        "de": "Vierter Video-Standort - 20m Radius"
+      }
     }
-  },
-  {
-    "videoUrl": "https://vimeo.com/1163655235",
-    "latitude": 47.390331,
-    "longitude": 8.512387,
-    "radius": 20,
-    "title": {
-      "en": "Location 4",
-      "de": "Standort 4"
+  ],
+  "overlay": {
+    "image": "pirate_map.png",
+    "topLeft": {
+      "latitude": 47.3828028,
+      "longitude": 8.525856
     },
-    "description": {
-      "en": "Fourth video location - 20m radius",
-      "de": "Vierter Video-Standort - 20m Radius"
-    }
+    "bottomRight": {
+      "latitude": 47.3771241,
+      "longitude": 8.5341774
+    },
+    "opacity": 1
   }
-  ]
 }
